@@ -1,0 +1,16 @@
+# Binary dan cache
+*.exe
+*.out
+*.test
+*.log
+
+# Dependency
+vendor/
+
+# Config
+.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
