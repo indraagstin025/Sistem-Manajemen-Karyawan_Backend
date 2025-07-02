@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
@@ -49,6 +50,33 @@ func MongoConnect() {
 
 	log.Println("Connected to MongoDB!")
 	MongoConn = client 
+}
+
+func InitDatabase() {
+	if MongoConn == nil {
+		log.Fatal("MongoDB client tidak diinisialisasi untuk InitDatabase. Panggil MongoConnect() terlebih dahulu.")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	userCollection := MongoConn.Database(DBName).Collection(UserCollection)
+
+	// Buat indeks unik untuk field 'email' di koleksi 'users'
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "email", Value: 1}}, // Indeks di field 'email', ascending
+		Options: options.Index().SetUnique(true),  // Jadikan indeks unik
+	}
+
+	_, err := userCollection.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		// Log error jika gagal membuat indeks (misal karena ada duplikat yang sudah ada)
+		log.Printf("Peringatan: Gagal membuat indeks unik untuk email di koleksi users: %v. Mungkin ada dokumen duplikat yang perlu dihapus manual.\n", err)
+	} else {
+		log.Println("Indeks unik untuk email berhasil dibuat di koleksi users.")
+	}
+
+	// Anda bisa menambahkan inisialisasi indeks lain di sini jika diperlukan
 }
 
 func GetCollection(collectionName string) *mongo.Collection {

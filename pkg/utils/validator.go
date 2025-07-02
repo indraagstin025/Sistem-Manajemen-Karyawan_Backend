@@ -31,22 +31,31 @@ func ValidateStruct(s interface{}) []*ErrorResponse {
 	var errors []*ErrorResponse
 	err := Validate.Struct(s)
 	if err != nil {
+
 		for _, err := range err.(validator.ValidationErrors) {
 			var element ErrorResponse
 			element.Field = err.Field()
 			element.Tag = err.Tag()
-			element.Msg = fmt.Sprintf("Field '%s' failed validation for tag '%s'", err.Field(), err.Tag())
 
-			if err.Tag() == "hasuppercase" {
-				element.Msg = "Password must contain at least one uppercase letter."
-			} else if err.Tag() == "email" {
-				element.Msg = "Invalid email format."
-			} else if err.Tag() == "required" {
-				element.Msg = fmt.Sprintf("Field '%s' is required.", err.Field())
-			} else if err.Tag() == "min" {
-				element.Msg = fmt.Sprintf("Field '%s' must be at least %s characters long.", err.Field(), err.Param())
-			} else if err.Tag() == "max" {
-				element.Msg = fmt.Sprintf("Field '%s' must be at most %s characters long.", err.Field(), err.Param())
+			switch err.Tag() {
+			case "required":
+				element.Msg = fmt.Sprintf("Kolom '%s' wajib diisi.", element.Field)
+			case "min":
+				element.Msg = fmt.Sprintf("Kolom '%s' harus memiliki minimal %s karakter/nilai.", element.Field, err.Param())
+			case "max":
+				element.Msg = fmt.Sprintf("Kolom '%s' harus memiliki maksimal %s karakter/nilai.", element.Field, err.Param())
+			case "email":
+				element.Msg = "Format email tidak valid."
+			case "hasuppercase":
+				element.Msg = "Password harus mengandung setidaknya satu huruf kapital."
+
+			case "url":
+				element.Msg = fmt.Sprintf("Kolom '%s' harus berupa format URL yang valid.", element.Field)
+			case "oneof":
+				element.Msg = fmt.Sprintf("Kolom '%s' harus salah satu dari: %s.", element.Field, err.Param())
+			default:
+
+				element.Msg = fmt.Sprintf("Kolom '%s' gagal validasi untuk tag '%s'.", element.Field, element.Tag)
 			}
 			errors = append(errors, &element)
 		}

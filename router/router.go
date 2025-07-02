@@ -1,17 +1,37 @@
-// Sistem-Manajemen-Karyawan/router/router.go
 package router
 
 import (
-    "github.com/gofiber/fiber/v2"
-    "log" // Tambahkan log untuk contoh sementara
+	"log"
+
+	"github.com/gofiber/fiber/v2"
+
+	"Sistem-Manajemen-Karyawan/config/middleware"
+	"Sistem-Manajemen-Karyawan/handlers"
+	"Sistem-Manajemen-Karyawan/repository"
 )
 
-// SetupRoutes mendaftarkan semua rute aplikasi Fiber.
 func SetupRoutes(app *fiber.App) {
-    log.Println("Setting up application routes...")
-    // Contoh rute dasar (nanti akan Anda isi dengan rute sebenarnya)
-    app.Get("/", func(c *fiber.Ctx) error {
-        return c.SendString("Aplikasi Fiber berjalan!")
-    })
-}
+	log.Println("Memulai pendaftaran rute aplikasi...")
 
+	userRepo := repository.NewUserRepository()
+
+	authHandler := handlers.NewAuthHandler(userRepo)
+	userHandler := handlers.NewUserHandler(userRepo)
+
+	api := app.Group("/api")
+
+	authGroup := api.Group("/auth")
+	authGroup.Post("/register", authHandler.Register)
+	authGroup.Post("/login", authHandler.Login)
+
+	protectedUserGroup := api.Group("/users", middleware.AuthMiddleware())
+	protectedUserGroup.Post("/change-password", authHandler.ChangePassword)
+	protectedUserGroup.Get("/:id", userHandler.GetUserByID)
+	protectedUserGroup.Put("/:id", userHandler.UpdateUser)
+
+	adminGroup := api.Group("/admin", middleware.AuthMiddleware(), middleware.AdminMiddleware())
+	adminGroup.Get("/users", userHandler.GetAllUsers)
+	adminGroup.Delete("/users/:id", userHandler.DeleteUser)
+
+	log.Println("Semua rute aplikasi berhasil didaftarkan dengan prefix '/api'.")
+}
