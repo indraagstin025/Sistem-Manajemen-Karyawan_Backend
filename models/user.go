@@ -55,3 +55,24 @@ type ChangePasswordPayload struct {
 }
 
 
+type DepartmentCount struct {
+	Department string `bson:"_id" json:"department"` // MongoDB group _id akan menjadi department
+	Count      int64  `bson:"count" json:"count"`
+}
+
+
+type DashboardStats struct {
+	TotalKaryawan       int64             `json:"total_karyawan"`
+	KaryawanAktif       int64             `json:"karyawan_aktif"`
+	KaryawanCuti        int64             `json:"karyawan_cuti"`
+	PosisiBaru          int64             `json:"posisi_baru"`
+	DistribusiDepartemen []DepartmentCount `json:"distribusi_departemen"`
+	AktivitasTerbaru    []string          `json:"aktivitas_terbaru"` 
+}
+
+type Department struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	Name      string             `bson:"name" json:"name"`
+	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
+}

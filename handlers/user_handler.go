@@ -3,9 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
+	"path/filepath"
 	"time"
+	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2" // Pastikan ini diimpor
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -35,11 +38,11 @@ func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Success 200 {object} models.GetUserSuccessResponse "User berhasil ditemukan"
-// @Failure 400 {object} models.ErrorResponse "Invalid user ID format"
+// @Failure 400 {object} fiber.Map "Invalid user ID format"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
 // @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa melihat data sendiri"
 // @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
-// @Failure 500 {object} models.ErrorResponse "Gagal mengambil data user"
+// @Failure 500 {object} fiber.Map "Internal server error"
 // @Router /users/{id} [get]
 func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 	idParam := c.Params("id")
@@ -65,6 +68,7 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 		if err == mongo.ErrNoDocuments {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
 		}
+		log.Printf("Error getting user by ID: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
 	}
 
@@ -137,11 +141,11 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 // @Param id path string true "User ID"
 // @Param user body models.UserUpdatePayload true "Data update user"
 // @Success 200 {object} models.UpdateUserSuccessResponse "User berhasil diupdate"
-// @Failure 400 {object} models.ErrorResponse "Invalid request body atau user ID"
+// @Failure 400 {object} fiber.Map "Invalid request body atau user ID"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
 // @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa update data sendiri"
 // @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
-// @Failure 500 {object} models.ErrorResponse "Gagal update user"
+// @Failure 500 {object} fiber.Map "Internal server error"
 // @Router /users/{id} [put]
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")
@@ -155,8 +159,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
 	}
 
-	// Otorisasi Tahap 1: Admin bisa update user manapun, karyawan hanya bisa update dirinya sendiri.
-	// Jika karyawan mencoba update orang lain, langsung ditolak di sini.
 	if claims.Role != "admin" && claims.UserID.Hex() != idParam {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat mengupdate profil anda sendiri."})
 	}
@@ -166,29 +168,20 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body", "details": err.Error()})
 	}
 
-	// Lakukan validasi payload secara umum
 	if errors := util.ValidateStruct(payload); errors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errors})
 	}
 
 	updateData := bson.M{}
 	
-	// Logika Otorisasi Per-Field:
-	// Karyawan (role != "admin") hanya boleh mengubah 'photo' dan 'address'.
-	// Admin (role == "admin") boleh mengubah semua field.
-
 	if claims.Role != "admin" { // Jika user yang melakukan request ADALAH KARYAWAN
-		// Izinkan karyawan mengubah field 'photo'
 		if payload.Photo != "" {
 			updateData["photo"] = payload.Photo
 		}
-		// Izinkan karyawan mengubah field 'address'
 		if payload.Address != "" {
 			updateData["address"] = payload.Address
 		}
 
-		// Periksa apakah karyawan mencoba mengubah field yang tidak diizinkan
-		// Field yang tidak diizinkan: Name, Email, Position, Department, BaseSalary
 		if payload.Name != "" || payload.Email != "" || 
 		   payload.Position != "" || payload.Department != "" || payload.BaseSalary != 0 {
 			
@@ -197,14 +190,13 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 			})
 		}
 	} else { // Jika user yang melakukan request ADALAH ADMIN
-		// Admin diizinkan mengubah semua field yang ada di payload
 		if payload.Name != "" {
 			updateData["name"] = payload.Name
 		}
 		if payload.Email != "" {
 			updateData["email"] = payload.Email
 		}
-		if payload.Position != "" { // Admin boleh mengubah posisi
+		if payload.Position != "" {
 			updateData["position"] = payload.Position
 		}
 		if payload.Department != "" {
@@ -213,15 +205,14 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		if payload.BaseSalary != 0 {
 			updateData["base_salary"] = payload.BaseSalary
 		}
-		if payload.Address != "" { // Admin juga boleh mengubah alamat
+		if payload.Address != "" {
 			updateData["address"] = payload.Address
 		}
-		if payload.Photo != "" { // Admin juga boleh mengubah foto
+		if payload.Photo != "" {
 			updateData["photo"] = payload.Photo
 		}
 	}
 
-	// Jika setelah otorisasi, tidak ada field yang tersisa untuk diupdate
 	if len(updateData) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tidak ada field yang akan diupdate"})
 	}
@@ -260,4 +251,124 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user berhasil dihapus"})
+}
+
+// GetDashboardStats godoc
+// @Summary Get Dashboard Statistics
+// @Description Mendapatkan berbagai statistik untuk dashboard admin (hanya admin yang dapat mengakses)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.DashboardStats "Statistik dashboard berhasil diambil"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
+// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya admin"
+// @Failure 500 {object} fiber.Map "Internal server error"
+// @Router /admin/dashboard-stats [get]
+func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+
+	stats, err := h.userRepo.GetDashboardStats(ctx) // Panggil fungsi repository yang baru
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mengambil statistik dashboard: %v", err)})
+	}
+	return c.Status(fiber.StatusOK).JSON(stats)
+}
+
+// NEW: UploadProfilePhoto menangani upload foto profil user
+// @Summary Upload User Profile Photo
+// @Description Mengunggah foto profil untuk user tertentu. Hanya admin atau user itu sendiri yang bisa mengunggah.
+// @Tags Users
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param photo formData file true "File foto profil (JPG, PNG, maks 5MB)"
+// @Success 200 {object} fiber.Map "message: Foto profil berhasil diunggah, photo_url: URL foto baru"
+// @Failure 400 {object} fiber.Map "error: Invalid file format, file size, or no file uploaded"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
+// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak"
+// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
+// @Failure 500 {object} fiber.Map "error: Internal server error"
+// @Router /users/{id}/upload-photo [post]
+func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format ID user tidak valid"})
+	}
+
+	claims, ok := c.Locals("user").(*paseto.Claims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi atau klaim token tidak valid"})
+	}
+
+	// Otorisasi: Hanya admin atau user yang bersangkutan yang bisa upload foto profil
+	if claims.Role != "admin" && claims.UserID.Hex() != userID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Akses ditolak. Anda hanya dapat mengunggah foto profil Anda sendiri."})
+	}
+
+	// Ambil file dari request
+file, err := c.FormFile("photo")
+if err != nil {
+    if strings.Contains(err.Error(), "no such file") {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tidak ada file foto yang diunggah."})
+    }
+
+
+		log.Printf("Error mengambil file: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil file."})
+	}
+
+	// Validasi Tipe File (hanya gambar)
+	allowedTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/gif":  true,
+		"image/webp": true,
+	}
+	if !allowedTypes[file.Header.Get("Content-Type")] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung. Hanya JPG, PNG, GIF, WEBP yang diizinkan."})
+	}
+
+	// Validasi Ukuran File (maksimal 5MB)
+	const maxFileSize = 5 * 1024 * 1024 // 5 MB
+	if file.Size > maxFileSize {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Ukuran file terlalu besar. Maksimal %d MB.", maxFileSize/1024/1024)})
+	}
+
+	// Tentukan lokasi penyimpanan (misal: folder 'uploads' di root proyek)
+	uploadDir := "./uploads" // Pastikan folder ini ada atau dibuat
+	fileName := fmt.Sprintf("%s_%d%s", userID, time.Now().Unix(), filepath.Ext(file.Filename))
+	filePath := filepath.Join(uploadDir, fileName)
+
+	// Simpan file secara lokal
+	if err := c.SaveFile(file, filePath); err != nil {
+		log.Printf("Error menyimpan file: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file foto."})
+	}
+
+	// Buat URL yang dapat diakses (sesuaikan dengan URL server Anda)
+	photoURL := fmt.Sprintf("http://localhost:3000/uploads/%s", fileName) // Sesuaikan base URL server Anda
+
+	// Update field 'photo' di database user
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+
+	updateData := bson.M{"photo": photoURL}
+	result, err := h.userRepo.UpdateUser(ctx, objID, updateData)
+	if err != nil {
+		log.Printf("Error mengupdate URL foto di database: %v", err)
+		// Jika update database gagal, pertimbangkan untuk menghapus file yang baru diupload
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui URL foto di database."})
+	}
+	if result.ModifiedCount == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User tidak ditemukan atau foto tidak berubah."})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":   "Foto profil berhasil diunggah.",
+		"photo_url": photoURL,
+	})
 }

@@ -1,15 +1,16 @@
 package main
 
 import (
-    "log"
+	"log"
 
-    "github.com/gofiber/fiber/v2"
-    "github.com/gofiber/fiber/v2/middleware/logger"
-    "github.com/joho/godotenv"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/joho/godotenv"
 
-    "Sistem-Manajemen-Karyawan/config"
-    "Sistem-Manajemen-Karyawan/router"
-    _ "Sistem-Manajemen-Karyawan/docs" // Import docs untuk swagger
+	"Sistem-Manajemen-Karyawan/config"
+	"Sistem-Manajemen-Karyawan/router"
+	// HAPUS: "Sistem-Manajemen-Karyawan/handlers" // Tidak perlu import handlers di sini
+	_ "Sistem-Manajemen-Karyawan/docs" // Import docs untuk swagger
 )
 
 // @title Sistem Manajemen Karyawan API
@@ -30,32 +31,32 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 func main() {
 
-    // Load .env file
-    err := godotenv.Load()
-    if err != nil {
-        log.Println("Warning: .env file tidak ditemukan, menggunakan environment variables sistem")
-    }
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Warning: .env file tidak ditemukan, menggunakan environment variables sistem")
+	}
 
-    cfg := config.LoadConfig()
+	cfg := config.LoadConfig() // Pastikan LoadConfig() ada dan berfungsi
 
-    config.MongoConnect()
-    config.InitDatabase()
+	config.MongoConnect()
+	config.InitDatabase() // Pastikan InitDatabase() dipanggil untuk membuat indeks, dll.
 
-    defer config.DisconnectDB()
+	defer config.DisconnectDB()
 
 	app := fiber.New()
 
-    // Setup CORS menggunakan konfigurasi dari cors.go
-    config.SetupCORS(app)
-    
-    app.Use(logger.New())
+	// Setup CORS menggunakan konfigurasi dari cors.go
+	config.SetupCORS(app) // Pastikan SetupCORS() ada dan berfungsi
+	
+	app.Use(logger.New())
 
-    // Setup routes (termasuk Swagger di dalamnya)
-    router.SetupRoutes(app)
+	// Setup routes (termasuk Swagger di dalamnya)
+	router.SetupRoutes(app) // Ini akan mendaftarkan semua rute Anda
 
-    log.Printf("Server running on port %s", cfg.Port)
-    log.Printf("API Documentation: http://localhost:%s/docs/index.html", cfg.Port)
-    log.Printf("Health Check: http://localhost:%s/", cfg.Port)
-    log.Printf("CORS enabled for origins: %v", config.GetAllowedOrigins())
-    log.Fatal(app.Listen(":" + cfg.Port))
+	log.Printf("Server running on port %s", cfg.Port)
+	log.Printf("API Documentation: http://localhost:%s/docs/index.html", cfg.Port)
+	log.Printf("Health Check: http://localhost:%s/", cfg.Port)
+	log.Printf("CORS enabled for origins: %v", config.GetAllowedOrigins()) // Pastikan GetAllowedOrigins() ada
+	log.Fatal(app.Listen(":" + cfg.Port))
 }
