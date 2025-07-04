@@ -6,10 +6,7 @@ import (
 )
 
 var allowedOrigins = []string{
-    "http://localhost:3000",        // Backend API
     "http://localhost:5173",        // Frontend Vite
-    "http://localhost:8080",        // Frontend alternatif
-    "http://127.0.0.1:3000",        // Backend API (localhost variant)
     "http://127.0.0.1:5173",        // Frontend alternatif
 }
 
