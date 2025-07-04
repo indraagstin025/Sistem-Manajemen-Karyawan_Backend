@@ -18,7 +18,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8088",
+    "host": "localhost:3000",
     "basePath": "/api/v1",
     "paths": {
         "/admin/users": {
@@ -60,73 +60,6 @@
                     },
                     "500": {
                         "description": "Gagal mengambil data users",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/users/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Menghapus user berdasarkan ID - hanya admin yang dapat mengakses endpoint ini",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Delete User (Admin Only)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "User berhasil dihapus",
-                        "schema": {
-                            "$ref": "#/definitions/models.DeleteUserSuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid user ID format",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Tidak terautentikasi",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Akses ditolak - hanya admin",
-                        "schema": {
-                            "$ref": "#/definitions/models.ForbiddenErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "User tidak ditemukan",
-                        "schema": {
-                            "$ref": "#/definitions/models.NotFoundErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Gagal menghapus user",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -455,19 +388,6 @@
                 "message": {
                     "type": "string",
                     "example": "Password berhasil diubah."
-                }
-            }
-        },
-        "models.DeleteUserSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "User berhasil dihapus"
-                },
-                "user_id": {
-                    "type": "string",
-                    "example": "507f1f77bcf86cd799439011"
                 }
             }
         },

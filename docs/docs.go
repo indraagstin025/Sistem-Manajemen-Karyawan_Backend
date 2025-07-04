@@ -70,73 +70,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Menghapus user berdasarkan ID - hanya admin yang dapat mengakses endpoint ini",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Delete User (Admin Only)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "User berhasil dihapus",
-                        "schema": {
-                            "$ref": "#/definitions/models.DeleteUserSuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid user ID format",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Tidak terautentikasi",
-                        "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Akses ditolak - hanya admin",
-                        "schema": {
-                            "$ref": "#/definitions/models.ForbiddenErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "User tidak ditemukan",
-                        "schema": {
-                            "$ref": "#/definitions/models.NotFoundErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Gagal menghapus user",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/auth/login": {
             "post": {
                 "description": "Melakukan proses login dan mengembalikan token PASETO jika email dan password valid",
@@ -461,19 +394,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.DeleteUserSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "User berhasil dihapus"
-                },
-                "user_id": {
-                    "type": "string",
-                    "example": "507f1f77bcf86cd799439011"
-                }
-            }
-        },
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -759,7 +679,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8088",
+	Host:             "localhost:3000",
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http"},
 	Title:            "Sistem Manajemen Karyawan API",

@@ -6,14 +6,11 @@ import (
 )
 
 var allowedOrigins = []string{
-    "http://localhost:8088",        // Backend API
+    "http://localhost:3000",        // Backend API
     "http://localhost:5173",        // Frontend Vite
-    "http://localhost:3000",        // Frontend alternatif
-    "http://127.0.0.1:8088",        // Swagger UI (localhost variant)
-    "https://localhost:8088",       // HTTPS variant
-	"*",                          // Temporary: allow all for testing
-    "https://indraagstin025.github.io",               // GitHub Pages (jika ada)
-    "https://yourdomain.com",                   // Production domain (jika ada)
+    "http://localhost:8080",        // Frontend alternatif
+    "http://127.0.0.1:3000",        // Backend API (localhost variant)
+    "http://127.0.0.1:5173",        // Frontend alternatif
 }
 
 func GetAllowedOrigins() []string {
