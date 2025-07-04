@@ -25,6 +25,17 @@ func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
 	}
 }
 
+// Register godoc
+// @Summary Register User
+// @Description Mendaftarkan user baru (hanya admin yang dapat melakukan registrasi)
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param user body models.UserRegisterPayload true "Data registrasi user"
+// @Success 201 {object} models.RegisterSuccessResponse "User berhasil didaftarkan"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body atau validation error"
+// @Failure 500 {object} models.ErrorResponse "Gagal hash password atau gagal mendaftarkan user"
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var payload models.UserRegisterPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -68,6 +79,18 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
+// Login godoc
+// @Summary Login User
+// @Description Melakukan proses login dan mengembalikan token PASETO jika email dan password valid
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param credentials body models.UserLoginPayload true "Login credentials"
+// @Success 200 {object} models.LoginSuccessResponse "Login berhasil"
+// @Failure 400 {object} models.ErrorResponse "Invalid request body"
+// @Failure 401 {object} models.ErrorResponse "Email tidak ditemukan atau password salah"
+// @Failure 500 {object} models.ErrorResponse "Gagal menemukan user atau gagal membuat token"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var payload models.UserLoginPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -106,6 +129,19 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	})
 }
 
+// ChangePassword godoc
+// @Summary Change Password
+// @Description Mengubah password user yang sedang login (required authentication)
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param password body models.ChangePasswordPayload true "Data untuk mengubah password"
+// @Success 200 {object} models.ChangePasswordSuccessResponse "Password berhasil diubah"
+// @Failure 400 {object} models.ErrorResponse "Invalid request body"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi atau password lama tidak cocok"
+// @Failure 500 {object} models.ErrorResponse "User tidak ditemukan atau gagal update"
+// @Router /users/change-password [post]
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 
 	claims, ok := c.Locals("user").(*paseto.Claims)

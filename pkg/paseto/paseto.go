@@ -24,17 +24,31 @@ var (
 )
 
 func init() {
-	cfg := config.LoadConfig()
+    cfg := config.LoadConfig()
 
-	decodedKey, err := base64.URLEncoding.DecodeString(cfg.PASETO_SECRET)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to decode PASETO_SECRET: %v", err))
-	}
-	if len(decodedKey) != 32 {
-		panic("PASETO_SECRET must be exactly 32 bytes after Base64 decoding")
-	}
+    // Try decode with different base64 variants
+    var decodedKey []byte
+    var err error
 
-	symmetricKey = decodedKey
+    // Try standard base64 URL encoding first
+    decodedKey, err = base64.URLEncoding.DecodeString(cfg.PASETO_SECRET)
+    if err != nil {
+        // Try with padding
+        decodedKey, err = base64.URLEncoding.WithPadding(base64.StdPadding).DecodeString(cfg.PASETO_SECRET)
+        if err != nil {
+            // Try standard base64
+            decodedKey, err = base64.StdEncoding.DecodeString(cfg.PASETO_SECRET)
+            if err != nil {
+                panic(fmt.Sprintf("Failed to decode PASETO_SECRET: %v", err))
+            }
+        }
+    }
+
+    if len(decodedKey) != 32 {
+        panic(fmt.Sprintf("PASETO_SECRET must be exactly 32 bytes after Base64 decoding, got %d bytes", len(decodedKey)))
+    }
+
+    symmetricKey = decodedKey
 }
 
 func GenerateToken(user *models.User) (string, error) {

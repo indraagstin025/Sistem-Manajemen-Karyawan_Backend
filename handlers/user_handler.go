@@ -26,7 +26,21 @@ func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
 	}
 }
 
-
+// GetUserByID godoc
+// @Summary Get User by ID
+// @Description Mendapatkan detail user berdasarkan ID (user hanya bisa melihat data diri sendiri, admin bisa melihat semua)
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {object} models.GetUserSuccessResponse "User berhasil ditemukan"
+// @Failure 400 {object} models.ErrorResponse "Invalid user ID format"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
+// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa melihat data sendiri"
+// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
+// @Failure 500 {object} models.ErrorResponse "Gagal mengambil data user"
+// @Router /users/{id} [get]
 func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(idParam)
@@ -58,6 +72,18 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(user)
 }
 
+// GetAllUsers godoc
+// @Summary Get All Users (Admin Only)
+// @Description Mendapatkan semua data users - hanya admin yang dapat mengakses endpoint ini
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.GetAllUsersSuccessResponse "Data users berhasil diambil"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
+// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya admin"
+// @Failure 500 {object} models.ErrorResponse "Gagal mengambil data users"
+// @Router /admin/users [get]
 func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
@@ -101,6 +127,22 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateUser godoc
+// @Summary Update User
+// @Description Update data user (user hanya bisa update data diri sendiri, admin bisa update semua)
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param user body models.UserUpdatePayload true "Data update user"
+// @Success 200 {object} models.UpdateUserSuccessResponse "User berhasil diupdate"
+// @Failure 400 {object} models.ErrorResponse "Invalid request body atau user ID"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
+// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa update data sendiri"
+// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
+// @Failure 500 {object} models.ErrorResponse "Gagal update user"
+// @Router /users/{id} [put]
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(idParam)
@@ -197,6 +239,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user berhasil diupdate"})
 }
+
 
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")

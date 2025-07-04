@@ -1,37 +1,63 @@
 package router
 
 import (
-	"log"
+    "log"
 
-	"github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/swagger"
 
-	"Sistem-Manajemen-Karyawan/config/middleware"
-	"Sistem-Manajemen-Karyawan/handlers"
-	"Sistem-Manajemen-Karyawan/repository"
+    "Sistem-Manajemen-Karyawan/config/middleware"
+    "Sistem-Manajemen-Karyawan/handlers"
+    "Sistem-Manajemen-Karyawan/repository"
+    _ "Sistem-Manajemen-Karyawan/docs" // Import docs untuk swagger
 )
 
 func SetupRoutes(app *fiber.App) {
-	log.Println("Memulai pendaftaran rute aplikasi...")
+    log.Println("Memulai pendaftaran rute aplikasi...")
 
-	userRepo := repository.NewUserRepository()
+    userRepo := repository.NewUserRepository()
+    authHandler := handlers.NewAuthHandler(userRepo)
+    userHandler := handlers.NewUserHandler(userRepo)
 
-	authHandler := handlers.NewAuthHandler(userRepo)
-	userHandler := handlers.NewUserHandler(userRepo)
+    // Health check endpoint
+    app.Get("/", func(c *fiber.Ctx) error {
+        return c.JSON(fiber.Map{
+            "message": "Sistem Manajemen Karyawan API",
+            "status":  "running",
+            "docs":    "/docs/index.html",
+        })
+    })
 
-	api := app.Group("/api")
+    // Swagger documentation endpoint
+    app.Get("/docs/*", swagger.HandlerDefault)
 
-	authGroup := api.Group("/auth")
-	authGroup.Post("/register", authHandler.Register)
-	authGroup.Post("/login", authHandler.Login)
+    // API v1 group
+    api := app.Group("/api/v1")
 
-	protectedUserGroup := api.Group("/users", middleware.AuthMiddleware())
-	protectedUserGroup.Post("/change-password", authHandler.ChangePassword)
-	protectedUserGroup.Get("/:id", userHandler.GetUserByID)
-	protectedUserGroup.Put("/:id", userHandler.UpdateUser)
+    // Authentication routes (public)
+    authGroup := api.Group("/auth")
+    authGroup.Post("/register", authHandler.Register)
+    authGroup.Post("/login", authHandler.Login)
 
-	adminGroup := api.Group("/admin", middleware.AuthMiddleware(), middleware.AdminMiddleware())
-	adminGroup.Get("/users", userHandler.GetAllUsers)
-	adminGroup.Delete("/users/:id", userHandler.DeleteUser)
+    // User routes (protected)
+    protectedUserGroup := api.Group("/users", middleware.AuthMiddleware())
+    protectedUserGroup.Post("/change-password", authHandler.ChangePassword)
+    protectedUserGroup.Get("/:id", userHandler.GetUserByID)
+    protectedUserGroup.Put("/:id", userHandler.UpdateUser)
 
-	log.Println("Semua rute aplikasi berhasil didaftarkan dengan prefix '/api'.")
+    // Admin routes (admin only)
+    adminGroup := api.Group("/admin", middleware.AuthMiddleware(), middleware.AdminMiddleware())
+    adminGroup.Get("/users", userHandler.GetAllUsers)
+    adminGroup.Delete("/users/:id", userHandler.DeleteUser)
+
+    log.Println("Semua rute aplikasi berhasil didaftarkan.")
+    log.Println("Routes yang tersedia:")
+    log.Println("- POST /api/v1/auth/register")
+    log.Println("- POST /api/v1/auth/login")
+    log.Println("- POST /api/v1/users/change-password (protected)")
+    log.Println("- GET /api/v1/users/:id (protected)")
+    log.Println("- PUT /api/v1/users/:id (protected)")
+    log.Println("- GET /api/v1/admin/users (admin only)")
+    log.Println("- DELETE /api/v1/admin/users/:id (admin only)")
+    log.Println("Swagger documentation tersedia di: /docs/index.html")
 }
