@@ -12,20 +12,18 @@ import (
 
 	"Sistem-Manajemen-Karyawan/models"
 	"Sistem-Manajemen-Karyawan/repository"
-	"Sistem-Manajemen-Karyawan/pkg/utils" // Menggunakan alias 'utils' sesuai impor Anda
+	"Sistem-Manajemen-Karyawan/pkg/utils" 
 )
 
-// DepartmentHandler menyediakan metode untuk berinteraksi dengan departemen.
+
 type DepartmentHandler struct {
 	deptRepo repository.DepartmentRepository
-	// HAPUS: validate *validator.Validate // Tidak perlu lagi karena validator global di pkg/utils
 }
 
-// NewDepartmentHandler membuat instance DepartmentHandler baru.
+
 func NewDepartmentHandler(deptRepo repository.DepartmentRepository) *DepartmentHandler {
 	return &DepartmentHandler{
 		deptRepo: deptRepo,
-		// HAPUS: validate: utils.NewValidator(), // Tidak perlu lagi
 	}
 }
 
@@ -48,15 +46,13 @@ func (h *DepartmentHandler) CreateDepartment(c *fiber.Ctx) error {
         return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
     }
 
-    // NEW: Gunakan langsung utils.ValidateStruct
     if errors := util.ValidateStruct(newDept); errors != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errors}) // Mengembalikan slice errors langsung
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errors}) 
     }
 
     ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
     defer cancel()
 
-    // Cek apakah nama departemen sudah ada
     existingDept, err := h.deptRepo.FindDepartmentByName(ctx, newDept.Name)
     if err != nil && err.Error() != "departemen tidak ditemukan" {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal memeriksa departemen: %v", err)})

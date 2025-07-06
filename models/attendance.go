@@ -33,3 +33,16 @@ type AttendanceUpdatePayload struct {
 	Status   string `json:"status,omitempty" validate:"omitempty,oneof=Hadir Telat Izin Sakit Cuti Alpha"`
 	Note     string `json:"note,omitempty"`
 }
+
+type AttendanceWithUser struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
+	Date      string             `json:"date" bson:"date"`
+	CheckIn   string             `json:"check_in" bson:"check_in"`
+	CheckOut  string             `json:"check_out,omitempty" bson:"check_out,omitempty"`
+	Status    string             `json:"status" bson:"status"`
+	Note      string             `json:"note,omitempty" bson:"note,omitempty"`
+	UserName  string             `json:"user_name" bson:"user_name"`
+	UserEmail string             `json:"user_email" bson:"user_email"`
+	UserPhoto string             `json:"user_photo,omitempty" bson:"user_photo,omitempty"`
+}
