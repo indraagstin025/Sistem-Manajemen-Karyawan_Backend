@@ -16,12 +16,12 @@ import (
 )
 
 type AuthHandler struct {
-	useRepo *repository.UserRepository
+	userRepo *repository.UserRepository
 }
 
 func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
 	return &AuthHandler{
-		useRepo: userRepo,
+		userRepo: userRepo,
 	}
 }
 
@@ -67,7 +67,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-	result, err := h.useRepo.CreateUser(ctx, newUser)
+	result, err := h.userRepo.CreateUser(ctx, newUser)
 	if err != nil {
 
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendaftarkan user: %v", err)})
@@ -79,17 +79,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
-// Login godoc
+// Login
 // @Summary Login User
-// @Description Melakukan proses login dan mengembalikan token PASETO jika email dan password valid
+// @Description Melakukan proses login dan mengembalikan token PASETO jika email dan password valid.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param credentials body models.UserLoginPayload true "Login credentials"
-// @Success 200 {object} models.LoginSuccessResponse "Login berhasil"
-// @Failure 400 {object} models.ErrorResponse "Invalid request body"
-// @Failure 401 {object} models.ErrorResponse "Email tidak ditemukan atau password salah"
-// @Failure 500 {object} models.ErrorResponse "Gagal menemukan user atau gagal membuat token"
+// @Param credentials body models.UserLoginPayload true "Kredensial untuk Login"
+// @Success 200 {object} object{message=string, token=string, user=models.User} "Login Berhasil"
+// @Failure 400 {object} object{error=string} "Payload tidak valid"
+// @Failure 401 {object} object{error=string} "Kombinasi email dan password salah"
+// @Failure 500 {object} object{error=string} "Error Internal Server"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var payload models.UserLoginPayload
@@ -103,29 +103,30 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-	user, err := h.useRepo.FindUserByEmail(ctx, payload.Email)
+	user, err := h.userRepo.FindUserByEmail(ctx, payload.Email)
 	if err != nil {
-		if err.Error() == "user tidak ditemukan" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "kredensial tidak valid"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal menemukan user: %v", err)})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Kombinasi email dan password salah"})
 	}
 
 	if !password.CheckPasswordHash(payload.Password, user.Password) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "kredensial tidak valid"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Kombinasi email dan password salah"})
 	}
 
-	token, err := paseto.GenerateToken(user)
+	pasetoMaker, err := paseto.NewPasetoMaker()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal membuat token"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menginisialisasi token generator"})
 	}
+
+	token, err := pasetoMaker.GenerateToken(user)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuat token"})
+	}
+
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":        "Login berhasil",
-		"token":          token,
-		"user_id":        user.ID,
-		"role":           user.Role,
-		"is_first_login": user.IsFirstLogin,
+		"message": "Login berhasil",
+		"token":   token,
+		"user":    user,
 	})
 }
 
@@ -142,16 +143,17 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi atau password lama tidak cocok"
 // @Failure 500 {object} models.ErrorResponse "User tidak ditemukan atau gagal update"
 // @Router /users/change-password [post]
-func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+// File: handlers/auth_handler.go
 
-	claims, ok := c.Locals("user").(*paseto.Claims)
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi atau data sesi rusak"})
 	}
 
 	var payload models.ChangePasswordPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	if errors := util.ValidateStruct(payload); errors != nil {
@@ -161,29 +163,36 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-	user, err := h.useRepo.FindUserByID(ctx, claims.UserID)
+	user, err := h.userRepo.FindUserByID(ctx, claims.UserID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "user tidak ditemukan"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "User tidak ditemukan"})
 	}
 
+	// 1. Cek dulu apakah password lama yang dimasukkan benar
 	if !password.CheckPasswordHash(payload.OldPassword, user.Password) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "password lama tidak cocok"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Password lama tidak cocok"})
+	}
+
+	if payload.NewPassword == payload.OldPassword {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Password baru tidak boleh sama dengan password lama."})
 	}
 
 	newHashedPassword, err := password.HashPassword(payload.NewPassword)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal hash password baru"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal hash password baru"})
 	}
 
 	updateData := bson.M{
 		"password":     newHashedPassword,
 		"isFirstLogin": false,
+		"updated_at":   time.Now(),
 	}
 
-	_, err = h.useRepo.UpdateUser(ctx, claims.UserID, updateData)
+	_, err = h.userRepo.UpdateUser(ctx, claims.UserID, updateData)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal update password: %v", err)})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal update password: %v", err)})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "password berhasil diubah."})
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Password berhasil diubah."})
 }
+

@@ -49,6 +49,12 @@ type UserUpdatePayload struct {
 	Photo       string  `json:"photo,omitempty" validate:"omitempty,url"`  
 }
 
+type Claims struct {
+	UserID       primitive.ObjectID `json:"user_id"`
+	Email        string             `json:"email"`
+	Role         string             `json:"role"`
+	IsFirstLogin bool               `json:"is_first_login"`
+}
 type ChangePasswordPayload struct {
 	OldPassword string `json:"old_password" validate:"required"`
 	NewPassword string `json:"new_password" validate:"required,min=8,max=50,hasuppercase"`
@@ -56,7 +62,7 @@ type ChangePasswordPayload struct {
 
 
 type DepartmentCount struct {
-	Department string `bson:"_id" json:"department"` // MongoDB group _id akan menjadi department
+	Department string `bson:"_id" json:"department"`
 	Count      int64  `bson:"count" json:"count"`
 }
 

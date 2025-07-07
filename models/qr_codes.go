@@ -9,10 +9,11 @@ import (
 type QRCode struct {
 	ID        primitive.ObjectID   `json:"id,omitempty" bson:"_id,omitempty"`
 	Code      string               `json:"code" bson:"code,omitempty"`
-	Date      string               `json:"date" bson:"date,omitempty"`
+	Date      string               `json:"date" bson:"date,omitempty"` 
 	ExpiresAt time.Time            `json:"expires_at" bson:"expires_at,omitempty"`
 	UsedBy    []primitive.ObjectID `json:"used_by" bson:"used_by,omitempty"`
 	CreatedAt time.Time            `json:"created_at" bson:"created_at,omitempty"`
+	UpdatedAt time.Time            `json:"updated_at" bson:"updated_at,omitempty"` 
 }
 
 type QRCodeGeneratePayload struct {

@@ -79,7 +79,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Rute khusus admin (middleware admin ditambahkan di sini)
 	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware())
-	adminAttendanceGroup.Post("/generate-qr", attendanceHandler.GenerateQRCode)
+	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
 	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance)
 	// ======================================================
 

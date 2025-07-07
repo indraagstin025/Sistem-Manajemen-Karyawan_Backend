@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/pkg/paseto"
 	"Sistem-Manajemen-Karyawan/repository"
 
 	"github.com/gofiber/fiber/v2"
@@ -30,9 +29,9 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
-	claims, ok := c.Locals("user").(*paseto.Claims)
+	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid atau sesi rusak"})
 	}
 
 	newRequest := &models.LeaveRequest{
@@ -125,17 +124,23 @@ func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
 		endDate, _ := time.Parse("2006-01-02", request.EndDate)
 
 		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
-attendanceRecord := &models.Attendance{
-    ID:        primitive.NewObjectID(),
-    UserID:    request.UserID,
-    Date:      d.Format("2006-01-02"),
-    Status:    request.RequestType, // Diubah dari "Izin" menjadi dinamis
-    Note:      "Disetujui: " + request.Reason,
-    CreatedAt: time.Now(),
-    UpdatedAt: time.Now(),
-}
-			h.attendanceRepo.CreateAttendance(attendanceRecord)
+			attendanceRecord := &models.Attendance{
+				ID:        primitive.NewObjectID(),
+				UserID:    request.UserID,
+				Date:      d.Format("2006-01-02"),
+				Status:    request.RequestType,
+				Note:      "Disetujui: " + request.Reason,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			_, err := h.attendanceRepo.CreateAttendance(c.Context(), attendanceRecord)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": fmt.Sprintf("Gagal menyimpan absensi tanggal %s", d.Format("2006-01-02")),
+				})
+			}
 		}
+
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Status pengajuan berhasil diperbarui"})

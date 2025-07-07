@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"time"
 	"strings"
+	"time"
 
-	"github.com/gofiber/fiber/v2" // Pastikan ini diimpor
+	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/pkg/paseto"
 	"Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
 )
@@ -51,7 +50,7 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
 	}
 
-	claims, ok := c.Locals("user").(*paseto.Claims)
+	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
 	}
@@ -154,7 +153,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
 	}
 
-	claims, ok := c.Locals("user").(*paseto.Claims)
+	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
 	}
@@ -173,8 +172,8 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 
 	updateData := bson.M{}
-	
-	if claims.Role != "admin" { // Jika user yang melakukan request ADALAH KARYAWAN
+
+	if claims.Role != "admin" {
 		if payload.Photo != "" {
 			updateData["photo"] = payload.Photo
 		}
@@ -182,14 +181,14 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 			updateData["address"] = payload.Address
 		}
 
-		if payload.Name != "" || payload.Email != "" || 
-		   payload.Position != "" || payload.Department != "" || payload.BaseSalary != 0 {
-			
+		if payload.Name != "" || payload.Email != "" ||
+			payload.Position != "" || payload.Department != "" || payload.BaseSalary != 0 {
+
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "akses ditolak. anda tidak diizinkan mengubah nama, email, posisi, departemen, atau gaji dasar.",
 			})
 		}
-	} else { // Jika user yang melakukan request ADALAH ADMIN
+	} else {
 		if payload.Name != "" {
 			updateData["name"] = payload.Name
 		}
@@ -231,7 +230,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user berhasil diupdate"})
 }
 
-
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(idParam)
@@ -269,7 +267,7 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-	stats, err := h.userRepo.GetDashboardStats(ctx) // Panggil fungsi repository yang baru
+	stats, err := h.userRepo.GetDashboardStats(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mengambil statistik dashboard: %v", err)})
 	}
@@ -299,29 +297,25 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format ID user tidak valid"})
 	}
 
-	claims, ok := c.Locals("user").(*paseto.Claims)
+	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi atau klaim token tidak valid"})
 	}
 
-	// Otorisasi: Hanya admin atau user yang bersangkutan yang bisa upload foto profil
 	if claims.Role != "admin" && claims.UserID.Hex() != userID {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Akses ditolak. Anda hanya dapat mengunggah foto profil Anda sendiri."})
 	}
 
-	// Ambil file dari request
-file, err := c.FormFile("photo")
-if err != nil {
-    if strings.Contains(err.Error(), "no such file") {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tidak ada file foto yang diunggah."})
-    }
-
+	file, err := c.FormFile("photo")
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tidak ada file foto yang diunggah."})
+		}
 
 		log.Printf("Error mengambil file: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil file."})
 	}
 
-	// Validasi Tipe File (hanya gambar)
 	allowedTypes := map[string]bool{
 		"image/jpeg": true,
 		"image/png":  true,
@@ -332,27 +326,22 @@ if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung. Hanya JPG, PNG, GIF, WEBP yang diizinkan."})
 	}
 
-	// Validasi Ukuran File (maksimal 5MB)
-	const maxFileSize = 5 * 1024 * 1024 // 5 MB
+	const maxFileSize = 5 * 1024 * 1024
 	if file.Size > maxFileSize {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Ukuran file terlalu besar. Maksimal %d MB.", maxFileSize/1024/1024)})
 	}
 
-	// Tentukan lokasi penyimpanan (misal: folder 'uploads' di root proyek)
-	uploadDir := "./uploads" // Pastikan folder ini ada atau dibuat
+	uploadDir := "./uploads"
 	fileName := fmt.Sprintf("%s_%d%s", userID, time.Now().Unix(), filepath.Ext(file.Filename))
 	filePath := filepath.Join(uploadDir, fileName)
 
-	// Simpan file secara lokal
 	if err := c.SaveFile(file, filePath); err != nil {
 		log.Printf("Error menyimpan file: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file foto."})
 	}
 
-	// Buat URL yang dapat diakses (sesuaikan dengan URL server Anda)
-	photoURL := fmt.Sprintf("http://localhost:3000/uploads/%s", fileName) // Sesuaikan base URL server Anda
+	photoURL := fmt.Sprintf("http://localhost:3000/uploads/%s", fileName)
 
-	// Update field 'photo' di database user
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
@@ -360,7 +349,6 @@ if err != nil {
 	result, err := h.userRepo.UpdateUser(ctx, objID, updateData)
 	if err != nil {
 		log.Printf("Error mengupdate URL foto di database: %v", err)
-		// Jika update database gagal, pertimbangkan untuk menghapus file yang baru diupload
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui URL foto di database."})
 	}
 	if result.ModifiedCount == 0 {

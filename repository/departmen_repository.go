@@ -10,11 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"Sistem-Manajemen-Karyawan/config" // Import package config
-	"Sistem-Manajemen-Karyawan/models" // Pastikan ini 'models'
+	"Sistem-Manajemen-Karyawan/config"
+	"Sistem-Manajemen-Karyawan/models"
 )
 
-// DepartmentRepository interface untuk operasi database departemen
 type DepartmentRepository interface {
 	CreateDepartment(ctx context.Context, department *models.Department) (*mongo.InsertOneResult, error)
 	GetAllDepartments(ctx context.Context) ([]models.Department, error)
@@ -28,15 +27,13 @@ type departmentRepository struct {
 	collection *mongo.Collection
 }
 
-// NewDepartmentRepository membuat instance DepartmentRepository baru
 func NewDepartmentRepository() DepartmentRepository {
-	// Menggunakan DepartmentCollection dari package config
+
 	return &departmentRepository{
-		collection: config.GetCollection(config.DepartmentCollection), 
+		collection: config.GetCollection(config.DepartmentCollection),
 	}
 }
 
-// CreateDepartment menambahkan departemen baru ke database
 func (r *departmentRepository) CreateDepartment(ctx context.Context, department *models.Department) (*mongo.InsertOneResult, error) {
 	department.ID = primitive.NewObjectID()
 	department.CreatedAt = time.Now()
@@ -52,10 +49,9 @@ func (r *departmentRepository) CreateDepartment(ctx context.Context, department 
 	return result, nil
 }
 
-// GetAllDepartments mengambil semua departemen
 func (r *departmentRepository) GetAllDepartments(ctx context.Context) ([]models.Department, error) {
 	var departments []models.Department
-	cursor, err := r.collection.Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}})) // Urutkan berdasarkan nama
+	cursor, err := r.collection.Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
 	if err != nil {
 		return nil, fmt.Errorf("gagal menemukan departemen: %w", err)
 	}
@@ -67,7 +63,6 @@ func (r *departmentRepository) GetAllDepartments(ctx context.Context) ([]models.
 	return departments, nil
 }
 
-// GetDepartmentByID mencari departemen berdasarkan ObjectID
 func (r *departmentRepository) GetDepartmentByID(ctx context.Context, id primitive.ObjectID) (*models.Department, error) {
 	var department models.Department
 	filter := bson.M{"_id": id}
@@ -81,7 +76,6 @@ func (r *departmentRepository) GetDepartmentByID(ctx context.Context, id primiti
 	return &department, nil
 }
 
-// UpdateDepartment memperbarui departemen berdasarkan ObjectID
 func (r *departmentRepository) UpdateDepartment(ctx context.Context, id primitive.ObjectID, updateData bson.M) (*mongo.UpdateResult, error) {
 	updateData["updated_at"] = time.Now()
 	filter := bson.M{"_id": id}
@@ -94,7 +88,6 @@ func (r *departmentRepository) UpdateDepartment(ctx context.Context, id primitiv
 	return result, nil
 }
 
-// DeleteDepartment menghapus departemen berdasarkan ObjectID.
 func (r *departmentRepository) DeleteDepartment(ctx context.Context, id primitive.ObjectID) (*mongo.DeleteResult, error) {
 	filter := bson.M{"_id": id}
 
@@ -105,7 +98,6 @@ func (r *departmentRepository) DeleteDepartment(ctx context.Context, id primitiv
 	return result, nil
 }
 
-// FindDepartmentByName mencari departemen berdasarkan nama
 func (r *departmentRepository) FindDepartmentByName(ctx context.Context, name string) (*models.Department, error) {
 	var department models.Department
 	filter := bson.M{"name": name}
