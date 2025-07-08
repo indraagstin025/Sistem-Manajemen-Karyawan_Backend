@@ -1,20 +1,21 @@
 {
     "schemes": [
-        "http"
+        "http",
+        "https"
     ],
     "swagger": "2.0",
     "info": {
-        "description": "API untuk sistem manajemen karyawan dengan authentication dan authorization",
+        "description": "API untuk sistem manajemen karyawan dengan fitur attendance, leave request, dan manajemen user",
         "title": "Sistem Manajemen Karyawan API",
-        "termsOfService": "http://swagger.io/terms/",
+        "termsOfService": "https://github.com/your-repo/terms/",
         "contact": {
             "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
+            "url": "https://github.com/your-repo",
+            "email": "support@example.com"
         },
         "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
         },
         "version": "1.0"
     },

@@ -269,14 +269,15 @@ definitions:
 host: localhost:3000
 info:
   contact:
-    email: support@swagger.io
+    email: support@example.com
     name: API Support
-    url: http://www.swagger.io/support
-  description: API untuk sistem manajemen karyawan dengan authentication dan authorization
+    url: https://github.com/your-repo
+  description: API untuk sistem manajemen karyawan dengan fitur attendance, leave
+    request, dan manajemen user
   license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://github.com/your-repo/terms/
   title: Sistem Manajemen Karyawan API
   version: "1.0"
 paths:
@@ -1333,6 +1334,7 @@ paths:
       - Auth
 schemes:
 - http
+- https
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

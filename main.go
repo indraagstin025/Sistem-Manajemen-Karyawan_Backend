@@ -15,20 +15,42 @@ import (
 
 // @title Sistem Manajemen Karyawan API
 // @version 1.0
-// @description API untuk sistem manajemen karyawan dengan authentication dan authorization
-// @termsOfService http://swagger.io/terms/
+// @description API untuk sistem manajemen karyawan dengan fitur attendance, leave request, dan manajemen user
+// @termsOfService https://github.com/your-repo/terms/
+//
 // @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @contact.url https://github.com/your-repo
+// @contact.email support@example.com
+//
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+//
 // @host localhost:3000
 // @BasePath /api/v1
-// @schemes http 
+// @schemes http https
+//
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
+//
+// @tag.name Auth
+// @tag.description Authentication endpoints
+//
+// @tag.name Users
+// @tag.description User management endpoints
+//
+// @tag.name Admin
+// @tag.description Admin only endpoints
+//
+// @tag.name Departments
+// @tag.description Department management endpoints
+//
+// @tag.name Attendance
+// @tag.description Attendance management endpoints
+//
+// @tag.name Leave Request
+// @tag.description Leave request management endpoints
 func main() {
 
 	// Load .env file
@@ -48,7 +70,7 @@ func main() {
 
 	// Setup CORS menggunakan konfigurasi dari cors.go
 	config.SetupCORS(app) // Pastikan SetupCORS() ada dan berfungsi
-	
+
 	app.Use(logger.New())
 
 	// Setup routes (termasuk Swagger di dalamnya)
