@@ -21,14 +21,14 @@
     "host": "localhost:3000",
     "basePath": "/api/v1",
     "paths": {
-        "/admin/users": {
+        "/admin/dashboard-stats": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Mendapatkan semua data users - hanya admin yang dapat mengakses endpoint ini",
+                "description": "Mendapatkan berbagai statistik untuk dashboard admin (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -38,30 +38,722 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Get All Users (Admin Only)",
+                "summary": "Get Dashboard Statistics",
                 "responses": {
                     "200": {
-                        "description": "Data users berhasil diambil",
+                        "description": "Statistik dashboard berhasil diambil",
                         "schema": {
-                            "$ref": "#/definitions/models.GetAllUsersSuccessResponse"
+                            "$ref": "#/definitions/models.DashboardStats"
                         }
                     },
                     "401": {
                         "description": "Tidak terautentikasi",
                         "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "403": {
                         "description": "Akses ditolak - hanya admin",
                         "schema": {
-                            "$ref": "#/definitions/models.ForbiddenErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil statistik dashboard",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/departments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menambahkan departemen baru (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create Department",
+                "parameters": [
+                    {
+                        "description": "Data departemen baru",
+                        "name": "department",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Department"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Departemen berhasil ditambahkan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body atau validation error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Nama departemen sudah ada",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal membuat departemen",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/departments/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Memperbarui departemen berdasarkan ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update Department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data departemen untuk diupdate",
+                        "name": "department",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Department"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Departemen berhasil diupdate",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, ID format, atau validation error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Departemen tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Nama departemen sudah ada",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengupdate departemen",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menghapus departemen berdasarkan ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete Department",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Departemen berhasil dihapus",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID format",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Departemen tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal menghapus departemen",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mendapatkan semua data users dengan pagination dan filter (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get All Users",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 10, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search by name or email",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by role",
+                        "name": "role",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data users berhasil diambil",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "data": {
+                                    "type": "array"
+                                },
+                                "limit": {
+                                    "type": "integer"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "total": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Akses ditolak - hanya admin",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
                         "description": "Gagal mengambil data users",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menghapus user berdasarkan ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete User",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User berhasil dihapus",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID format",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal menghapus user",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attendance/generate-qr": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Membuat QR code baru untuk attendance atau mengembalikan QR code yang masih aktif",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Generate QR Code untuk Attendance",
+                "responses": {
+                    "200": {
+                        "description": "QR Code berhasil dibuat atau sudah ada",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "expires_at": {
+                                    "type": "string"
+                                },
+                                "message": {
+                                    "type": "string"
+                                },
+                                "qr_code_image": {
+                                    "type": "string"
+                                },
+                                "qr_code_value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal membuat QR Code",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attendance/my-history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil seluruh riwayat absensi untuk user yang sedang login",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Attendance"
+                ],
+                "summary": "Get My Attendance History",
+                "responses": {
+                    "200": {
+                        "description": "Riwayat absensi berhasil diambil",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Attendance"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi atau token tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil riwayat absensi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attendance/scan": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Melakukan scan QR code untuk proses check-in atau check-out karyawan",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Attendance"
+                ],
+                "summary": "Scan QR Code untuk Check-in/Check-out",
+                "parameters": [
+                    {
+                        "description": "Data QR Code scan",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.QRCodeScanPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil check-in/check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Berhasil check-in",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Payload tidak valid atau QR Code bermasalah",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "QR Code tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Sudah melakukan check-in dan check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal melakukan check-in/check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attendance/today": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil daftar kehadiran karyawan untuk hari ini dengan detail user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get Today's Attendance List",
+                "responses": {
+                    "200": {
+                        "description": "Daftar kehadiran hari ini berhasil diambil",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.AttendanceWithUser"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil daftar kehadiran",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -82,7 +774,7 @@
                 "summary": "Login User",
                 "parameters": [
                     {
-                        "description": "Login credentials",
+                        "description": "Kredensial untuk Login",
                         "name": "credentials",
                         "in": "body",
                         "required": true,
@@ -95,25 +787,54 @@
                     "200": {
                         "description": "Login berhasil",
                         "schema": {
-                            "$ref": "#/definitions/models.LoginSuccessResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "token": {
+                                    "type": "string"
+                                },
+                                "user": {
+                                    "$ref": "#/definitions/models.User"
+                                }
+                            }
                         }
                     },
                     "400": {
-                        "description": "Invalid request body",
+                        "description": "Payload tidak valid atau validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
                         }
                     },
                     "401": {
-                        "description": "Email tidak ditemukan atau password salah",
+                        "description": "Kombinasi email dan password salah",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
-                        "description": "Gagal menemukan user atau gagal membuat token",
+                        "description": "Error internal server",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -121,7 +842,12 @@
         },
         "/auth/register": {
             "post": {
-                "description": "Mendaftarkan user baru (hanya admin yang dapat melakukan registrasi)",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mendaftarkan user baru (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -147,19 +873,422 @@
                     "201": {
                         "description": "User berhasil didaftarkan",
                         "schema": {
-                            "$ref": "#/definitions/models.RegisterSuccessResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "user_id": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "400": {
                         "description": "Invalid request body atau validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.ValidationErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
                         }
                     },
                     "500": {
                         "description": "Gagal hash password atau gagal mendaftarkan user",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/departments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mendapatkan daftar semua departemen",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Departments"
+                ],
+                "summary": "Get All Departments",
+                "responses": {
+                    "200": {
+                        "description": "Daftar departemen berhasil diambil",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Department"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil departemen",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/departments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mendapatkan detail departemen berdasarkan ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Departments"
+                ],
+                "summary": "Get Department by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Department ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Departemen berhasil ditemukan",
+                        "schema": {
+                            "$ref": "#/definitions/models.Department"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID format",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Departemen tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil departemen",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leave-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil semua pengajuan izin/cuti/sakit (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get All Leave Requests",
+                "responses": {
+                    "200": {
+                        "description": "Daftar pengajuan berhasil diambil",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.LeaveRequest"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil data pengajuan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Membuat pengajuan izin/cuti/sakit baru",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Leave Request"
+                ],
+                "summary": "Create Leave Request",
+                "parameters": [
+                    {
+                        "description": "Data pengajuan izin",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.LeaveRequestCreatePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Pengajuan berhasil dibuat",
+                        "schema": {
+                            "$ref": "#/definitions/models.LeaveRequest"
+                        }
+                    },
+                    "400": {
+                        "description": "Payload tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal membuat pengajuan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leave-requests/{id}/attachment": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengunggah file lampiran untuk pengajuan izin/cuti/sakit",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Leave Request"
+                ],
+                "summary": "Upload Attachment for Leave Request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Leave Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File lampiran",
+                        "name": "attachment",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File berhasil diunggah",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "file_url": {
+                                    "type": "string"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID tidak valid atau file tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal menyimpan file",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leave-requests/{id}/status": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Memperbarui status pengajuan izin/cuti/sakit (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update Leave Request Status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Leave Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data update status",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.LeaveRequestUpdatePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status pengajuan berhasil diperbarui",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID tidak valid atau payload tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pengajuan tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal memperbarui status",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -198,25 +1327,48 @@
                     "200": {
                         "description": "Password berhasil diubah",
                         "schema": {
-                            "$ref": "#/definitions/models.ChangePasswordSuccessResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "400": {
-                        "description": "Invalid request body",
+                        "description": "Invalid request body atau validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
                         }
                     },
                     "401": {
                         "description": "Tidak terautentikasi atau password lama tidak cocok",
                         "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
                         "description": "User tidak ditemukan atau gagal update",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -253,37 +1405,62 @@
                     "200": {
                         "description": "User berhasil ditemukan",
                         "schema": {
-                            "$ref": "#/definitions/models.GetUserSuccessResponse"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
                         "description": "Invalid user ID format",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "401": {
                         "description": "Tidak terautentikasi",
                         "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "403": {
                         "description": "Akses ditolak - hanya bisa melihat data sendiri",
                         "schema": {
-                            "$ref": "#/definitions/models.ForbiddenErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "404": {
                         "description": "User tidak ditemukan",
                         "schema": {
-                            "$ref": "#/definitions/models.NotFoundErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
-                        "description": "Gagal mengambil data user",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -327,37 +1504,177 @@
                     "200": {
                         "description": "User berhasil diupdate",
                         "schema": {
-                            "$ref": "#/definitions/models.UpdateUserSuccessResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "400": {
-                        "description": "Invalid request body atau user ID",
+                        "description": "Invalid request body, user ID, atau validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                },
+                                "errors": {
+                                    "type": "array"
+                                }
+                            }
                         }
                     },
                     "401": {
                         "description": "Tidak terautentikasi",
                         "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "403": {
                         "description": "Akses ditolak - hanya bisa update data sendiri",
                         "schema": {
-                            "$ref": "#/definitions/models.ForbiddenErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "404": {
                         "description": "User tidak ditemukan",
                         "schema": {
-                            "$ref": "#/definitions/models.NotFoundErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "500": {
-                        "description": "Gagal update user",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}/upload-photo": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengunggah foto profil untuk user tertentu. Hanya admin atau user itu sendiri yang bisa mengunggah.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Upload User Profile Photo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File foto profil (JPG, PNG, GIF, WEBP, maks 5MB)",
+                        "name": "photo",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Foto profil berhasil diunggah",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                },
+                                "photo_url": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid file format, file size, atau no file uploaded",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Akses ditolak",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -365,6 +1682,79 @@
         }
     },
     "definitions": {
+        "models.Attendance": {
+            "type": "object",
+            "properties": {
+                "check_in": {
+                    "type": "string"
+                },
+                "check_out": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AttendanceWithUser": {
+            "type": "object",
+            "properties": {
+                "check_in": {
+                    "type": "string"
+                },
+                "check_out": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_department": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_photo": {
+                    "type": "string"
+                },
+                "user_position": {
+                    "type": "string"
+                }
+            }
+        },
         "models.ChangePasswordPayload": {
             "type": "object",
             "required": [
@@ -382,134 +1772,168 @@
                 }
             }
         },
-        "models.ChangePasswordSuccessResponse": {
+        "models.DashboardStats": {
             "type": "object",
             "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Password berhasil diubah."
-                }
-            }
-        },
-        "models.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "details": {
-                    "type": "string",
-                    "example": "validation failed"
-                },
-                "error": {
-                    "type": "string",
-                    "example": "Invalid request body"
-                }
-            }
-        },
-        "models.ForbiddenErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "Akses ditolak. Hanya admin yang dapat mengakses endpoint ini"
-                }
-            }
-        },
-        "models.GetAllUsersSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Data users berhasil diambil"
-                },
-                "total": {
-                    "type": "integer",
-                    "example": 10
-                },
-                "users": {
+                "aktivitas_terbaru": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.User"
+                        "type": "string"
                     }
+                },
+                "distribusi_departemen": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DepartmentCount"
+                    }
+                },
+                "karyawan_aktif": {
+                    "type": "integer"
+                },
+                "karyawan_cuti": {
+                    "type": "integer"
+                },
+                "posisi_baru": {
+                    "type": "integer"
+                },
+                "total_karyawan": {
+                    "type": "integer"
                 }
             }
         },
-        "models.GetUserSuccessResponse": {
+        "models.Department": {
             "type": "object",
             "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "User berhasil ditemukan"
+                "created_at": {
+                    "type": "string"
                 },
-                "user": {
-                    "$ref": "#/definitions/models.User"
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
-        "models.LoginSuccessResponse": {
+        "models.DepartmentCount": {
             "type": "object",
             "properties": {
-                "is_first_login": {
-                    "type": "boolean",
-                    "example": true
+                "count": {
+                    "type": "integer"
                 },
-                "message": {
-                    "type": "string",
-                    "example": "Login berhasil"
+                "department": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LeaveRequest": {
+            "type": "object",
+            "properties": {
+                "attachment_url": {
+                    "type": "string"
                 },
-                "role": {
-                    "type": "string",
-                    "example": "karyawan"
+                "created_at": {
+                    "type": "string"
                 },
-                "token": {
-                    "type": "string",
-                    "example": "v2.local.Ft9QcxZhJXEYyb7-bMM..."
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_type": {
+                    "description": "TAMBAHAN: \"Cuti\", \"Sakit\", \"Izin\"",
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 },
                 "user_id": {
-                    "type": "string",
-                    "example": "507f1f77bcf86cd799439011"
+                    "type": "string"
                 }
             }
         },
-        "models.NotFoundErrorResponse": {
+        "models.LeaveRequestCreatePayload": {
             "type": "object",
+            "required": [
+                "end_date",
+                "reason",
+                "request_type",
+                "start_date",
+                "user_id"
+            ],
             "properties": {
-                "error": {
+                "end_date": {
+                    "type": "string"
+                },
+                "reason": {
                     "type": "string",
-                    "example": "User tidak ditemukan"
-                }
-            }
-        },
-        "models.RegisterSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
+                    "maxLength": 500,
+                    "minLength": 10
+                },
+                "request_type": {
+                    "description": "TAMBAHAN",
                     "type": "string",
-                    "example": "User berhasil didaftarkan (oleh admin)"
+                    "enum": [
+                        "Cuti",
+                        "Sakit",
+                        "Izin"
+                    ]
+                },
+                "start_date": {
+                    "type": "string"
                 },
                 "user_id": {
-                    "type": "string",
-                    "example": "507f1f77bcf86cd799439011"
+                    "type": "string"
                 }
             }
         },
-        "models.UnauthorizedErrorResponse": {
+        "models.LeaveRequestUpdatePayload": {
             "type": "object",
+            "required": [
+                "status"
+            ],
             "properties": {
-                "error": {
+                "note": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string",
-                    "example": "Token tidak valid atau tidak ada"
+                    "enum": [
+                        "pending",
+                        "approved",
+                        "rejected"
+                    ]
                 }
             }
         },
-        "models.UpdateUserSuccessResponse": {
+        "models.QRCodeScanPayload": {
             "type": "object",
+            "required": [
+                "qr_code_value",
+                "user_id"
+            ],
             "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "User berhasil diupdate"
+                "qr_code_value": {
+                    "type": "string"
                 },
                 "user_id": {
-                    "type": "string",
-                    "example": "507f1f77bcf86cd799439011"
+                    "type": "string"
                 }
             }
         },
@@ -646,19 +2070,6 @@
                 },
                 "position": {
                     "type": "string"
-                }
-            }
-        },
-        "models.ValidationErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "Validation failed"
-                },
-                "errors": {
-                    "type": "string",
-                    "example": "email: email tidak valid, password: password terlalu pendek"
                 }
             }
         }

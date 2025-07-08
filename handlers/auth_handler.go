@@ -11,7 +11,7 @@ import (
 	"Sistem-Manajemen-Karyawan/models"
 	"Sistem-Manajemen-Karyawan/pkg/paseto"
 	"Sistem-Manajemen-Karyawan/pkg/password"
-	"Sistem-Manajemen-Karyawan/pkg/utils"
+	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
 )
 
@@ -27,14 +27,15 @@ func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
 
 // Register godoc
 // @Summary Register User
-// @Description Mendaftarkan user baru (hanya admin yang dapat melakukan registrasi)
+// @Description Mendaftarkan user baru (admin only)
 // @Tags Auth
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param user body models.UserRegisterPayload true "Data registrasi user"
-// @Success 201 {object} models.RegisterSuccessResponse "User berhasil didaftarkan"
-// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body atau validation error"
-// @Failure 500 {object} models.ErrorResponse "Gagal hash password atau gagal mendaftarkan user"
+// @Success 201 {object} object{message=string,user_id=string} "User berhasil didaftarkan"
+// @Failure 400 {object} object{error=string,errors=array} "Invalid request body atau validation error"
+// @Failure 500 {object} object{error=string} "Gagal hash password atau gagal mendaftarkan user"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var payload models.UserRegisterPayload
@@ -79,17 +80,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
-// Login
+// Login godoc
 // @Summary Login User
-// @Description Melakukan proses login dan mengembalikan token PASETO jika email dan password valid.
+// @Description Melakukan proses login dan mengembalikan token PASETO jika email dan password valid
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Param credentials body models.UserLoginPayload true "Kredensial untuk Login"
-// @Success 200 {object} object{message=string, token=string, user=models.User} "Login Berhasil"
-// @Failure 400 {object} object{error=string} "Payload tidak valid"
+// @Success 200 {object} object{message=string,token=string,user=models.User} "Login berhasil"
+// @Failure 400 {object} object{error=string,errors=array} "Payload tidak valid atau validation error"
 // @Failure 401 {object} object{error=string} "Kombinasi email dan password salah"
-// @Failure 500 {object} object{error=string} "Error Internal Server"
+// @Failure 500 {object} object{error=string} "Error internal server"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var payload models.UserLoginPayload
@@ -122,7 +123,6 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuat token"})
 	}
 
-
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Login berhasil",
 		"token":   token,
@@ -138,13 +138,11 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param password body models.ChangePasswordPayload true "Data untuk mengubah password"
-// @Success 200 {object} models.ChangePasswordSuccessResponse "Password berhasil diubah"
-// @Failure 400 {object} models.ErrorResponse "Invalid request body"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi atau password lama tidak cocok"
-// @Failure 500 {object} models.ErrorResponse "User tidak ditemukan atau gagal update"
+// @Success 200 {object} object{message=string} "Password berhasil diubah"
+// @Failure 400 {object} object{error=string,errors=array} "Invalid request body atau validation error"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi atau password lama tidak cocok"
+// @Failure 500 {object} object{error=string} "User tidak ditemukan atau gagal update"
 // @Router /users/change-password [post]
-// File: handlers/auth_handler.go
-
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
@@ -195,4 +193,3 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Password berhasil diubah."})
 }
-

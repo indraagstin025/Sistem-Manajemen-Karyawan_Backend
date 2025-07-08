@@ -23,6 +23,19 @@ func NewLeaveRequestHandler(leaveRepo repository.LeaveRequestRepository, attenda
 	}
 }
 
+// CreateLeaveRequest godoc
+// @Summary Create Leave Request
+// @Description Membuat pengajuan izin/cuti/sakit baru
+// @Tags Leave Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body models.LeaveRequestCreatePayload true "Data pengajuan izin"
+// @Success 201 {object} models.LeaveRequest "Pengajuan berhasil dibuat"
+// @Failure 400 {object} object{error=string} "Payload tidak valid"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 500 {object} object{error=string} "Gagal membuat pengajuan"
+// @Router /leave-requests [post]
 func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	var payload models.LeaveRequestCreatePayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -53,6 +66,16 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(newRequest)
 }
 
+// GetAllLeaveRequests godoc
+// @Summary Get All Leave Requests
+// @Description Mengambil semua pengajuan izin/cuti/sakit (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.LeaveRequest "Daftar pengajuan berhasil diambil"
+// @Failure 500 {object} object{error=string} "Gagal mengambil data pengajuan"
+// @Router /leave-requests [get]
 func (h *LeaveRequestHandler) GetAllLeaveRequests(c *fiber.Ctx) error {
 	requests, err := h.leaveRepo.FindAll()
 	if err != nil {
@@ -61,6 +84,19 @@ func (h *LeaveRequestHandler) GetAllLeaveRequests(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(requests)
 }
 
+// UploadAttachment godoc
+// @Summary Upload Attachment for Leave Request
+// @Description Mengunggah file lampiran untuk pengajuan izin/cuti/sakit
+// @Tags Leave Request
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Leave Request ID"
+// @Param attachment formData file true "File lampiran"
+// @Success 200 {object} object{message=string,file_url=string} "File berhasil diunggah"
+// @Failure 400 {object} object{error=string} "ID tidak valid atau file tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal menyimpan file"
+// @Router /leave-requests/{id}/attachment [post]
 func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 	id := c.Params("id")
 	reqID, err := primitive.ObjectIDFromHex(id)
@@ -93,6 +129,20 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateLeaveRequestStatus godoc
+// @Summary Update Leave Request Status
+// @Description Memperbarui status pengajuan izin/cuti/sakit (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Leave Request ID"
+// @Param payload body models.LeaveRequestUpdatePayload true "Data update status"
+// @Success 200 {object} object{message=string} "Status pengajuan berhasil diperbarui"
+// @Failure 400 {object} object{error=string} "ID tidak valid atau payload tidak valid"
+// @Failure 404 {object} object{error=string} "Pengajuan tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal memperbarui status"
+// @Router /leave-requests/{id}/status [put]
 func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
 	id := c.Params("id")
 	reqID, err := primitive.ObjectIDFromHex(id)

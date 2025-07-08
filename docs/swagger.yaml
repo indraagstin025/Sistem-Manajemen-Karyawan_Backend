@@ -1,5 +1,53 @@
 basePath: /api/v1
 definitions:
+  models.Attendance:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      created_at:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.AttendanceWithUser:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      status:
+        type: string
+      user_department:
+        type: string
+      user_email:
+        type: string
+      user_id:
+        type: string
+      user_name:
+        type: string
+      user_photo:
+        type: string
+      user_position:
+        type: string
+    type: object
   models.ChangePasswordPayload:
     properties:
       new_password:
@@ -12,95 +60,117 @@ definitions:
     - new_password
     - old_password
     type: object
-  models.ChangePasswordSuccessResponse:
+  models.DashboardStats:
     properties:
-      message:
-        example: Password berhasil diubah.
-        type: string
-    type: object
-  models.ErrorResponse:
-    properties:
-      details:
-        example: validation failed
-        type: string
-      error:
-        example: Invalid request body
-        type: string
-    type: object
-  models.ForbiddenErrorResponse:
-    properties:
-      error:
-        example: Akses ditolak. Hanya admin yang dapat mengakses endpoint ini
-        type: string
-    type: object
-  models.GetAllUsersSuccessResponse:
-    properties:
-      message:
-        example: Data users berhasil diambil
-        type: string
-      total:
-        example: 10
-        type: integer
-      users:
+      aktivitas_terbaru:
         items:
-          $ref: '#/definitions/models.User'
+          type: string
         type: array
+      distribusi_departemen:
+        items:
+          $ref: '#/definitions/models.DepartmentCount'
+        type: array
+      karyawan_aktif:
+        type: integer
+      karyawan_cuti:
+        type: integer
+      posisi_baru:
+        type: integer
+      total_karyawan:
+        type: integer
     type: object
-  models.GetUserSuccessResponse:
+  models.Department:
     properties:
-      message:
-        example: User berhasil ditemukan
+      created_at:
         type: string
-      user:
-        $ref: '#/definitions/models.User'
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
     type: object
-  models.LoginSuccessResponse:
+  models.DepartmentCount:
     properties:
-      is_first_login:
-        example: true
-        type: boolean
-      message:
-        example: Login berhasil
+      count:
+        type: integer
+      department:
         type: string
-      role:
-        example: karyawan
+    type: object
+  models.LeaveRequest:
+    properties:
+      attachment_url:
         type: string
-      token:
-        example: v2.local.Ft9QcxZhJXEYyb7-bMM...
+      created_at:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+      request_type:
+        description: 'TAMBAHAN: "Cuti", "Sakit", "Izin"'
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
         type: string
       user_id:
-        example: 507f1f77bcf86cd799439011
         type: string
     type: object
-  models.NotFoundErrorResponse:
+  models.LeaveRequestCreatePayload:
     properties:
-      error:
-        example: User tidak ditemukan
+      end_date:
         type: string
-    type: object
-  models.RegisterSuccessResponse:
-    properties:
-      message:
-        example: User berhasil didaftarkan (oleh admin)
+      reason:
+        maxLength: 500
+        minLength: 10
+        type: string
+      request_type:
+        description: TAMBAHAN
+        enum:
+        - Cuti
+        - Sakit
+        - Izin
+        type: string
+      start_date:
         type: string
       user_id:
-        example: 507f1f77bcf86cd799439011
         type: string
+    required:
+    - end_date
+    - reason
+    - request_type
+    - start_date
+    - user_id
     type: object
-  models.UnauthorizedErrorResponse:
+  models.LeaveRequestUpdatePayload:
     properties:
-      error:
-        example: Token tidak valid atau tidak ada
+      note:
         type: string
+      status:
+        enum:
+        - pending
+        - approved
+        - rejected
+        type: string
+    required:
+    - status
     type: object
-  models.UpdateUserSuccessResponse:
+  models.QRCodeScanPayload:
     properties:
-      message:
-        example: User berhasil diupdate
+      qr_code_value:
         type: string
       user_id:
-        example: 507f1f77bcf86cd799439011
         type: string
+    required:
+    - qr_code_value
+    - user_id
     type: object
   models.User:
     properties:
@@ -196,15 +266,6 @@ definitions:
       position:
         type: string
     type: object
-  models.ValidationErrorResponse:
-    properties:
-      error:
-        example: Validation failed
-        type: string
-      errors:
-        example: 'email: email tidak valid, password: password terlalu pendek'
-        type: string
-    type: object
 host: localhost:3000
 info:
   contact:
@@ -219,34 +280,470 @@ info:
   title: Sistem Manajemen Karyawan API
   version: "1.0"
 paths:
+  /admin/dashboard-stats:
+    get:
+      consumes:
+      - application/json
+      description: Mendapatkan berbagai statistik untuk dashboard admin (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistik dashboard berhasil diambil
+          schema:
+            $ref: '#/definitions/models.DashboardStats'
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Akses ditolak - hanya admin
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil statistik dashboard
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Dashboard Statistics
+      tags:
+      - Admin
+  /admin/departments:
+    post:
+      consumes:
+      - application/json
+      description: Menambahkan departemen baru (admin only)
+      parameters:
+      - description: Data departemen baru
+        in: body
+        name: department
+        required: true
+        schema:
+          $ref: '#/definitions/models.Department'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Departemen berhasil ditambahkan
+          schema:
+            properties:
+              id:
+                type: string
+              message:
+                type: string
+            type: object
+        "400":
+          description: Invalid request body atau validation error
+          schema:
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
+        "409":
+          description: Nama departemen sudah ada
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal membuat departemen
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create Department
+      tags:
+      - Admin
+  /admin/departments/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus departemen berdasarkan ID (admin only)
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Departemen berhasil dihapus
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Invalid ID format
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Departemen tidak ditemukan
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "500":
+          description: Gagal menghapus departemen
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete Department
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui departemen berdasarkan ID (admin only)
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data departemen untuk diupdate
+        in: body
+        name: department
+        required: true
+        schema:
+          $ref: '#/definitions/models.Department'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Departemen berhasil diupdate
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Invalid request body, ID format, atau validation error
+          schema:
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
+        "404":
+          description: Departemen tidak ditemukan
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "409":
+          description: Nama departemen sudah ada
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengupdate departemen
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update Department
+      tags:
+      - Admin
   /admin/users:
     get:
       consumes:
       - application/json
-      description: Mendapatkan semua data users - hanya admin yang dapat mengakses
-        endpoint ini
+      description: Mendapatkan semua data users dengan pagination dan filter (admin
+        only)
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: Search by name or email
+        in: query
+        name: search
+        type: string
+      - description: Filter by role
+        in: query
+        name: role
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: Data users berhasil diambil
           schema:
-            $ref: '#/definitions/models.GetAllUsersSuccessResponse'
+            properties:
+              data:
+                type: array
+              limit:
+                type: integer
+              page:
+                type: integer
+              total:
+                type: integer
+            type: object
         "401":
           description: Tidak terautentikasi
           schema:
-            $ref: '#/definitions/models.UnauthorizedErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "403":
           description: Akses ditolak - hanya admin
           schema:
-            $ref: '#/definitions/models.ForbiddenErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "500":
           description: Gagal mengambil data users
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       security:
       - BearerAuth: []
-      summary: Get All Users (Admin Only)
+      summary: Get All Users
+      tags:
+      - Admin
+  /admin/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus user berdasarkan ID (admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User berhasil dihapus
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Invalid ID format
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: User tidak ditemukan
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "500":
+          description: Gagal menghapus user
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete User
+      tags:
+      - Admin
+  /attendance/generate-qr:
+    get:
+      consumes:
+      - application/json
+      description: Membuat QR code baru untuk attendance atau mengembalikan QR code
+        yang masih aktif
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: QR Code berhasil dibuat atau sudah ada
+          schema:
+            properties:
+              expires_at:
+                type: string
+              message:
+                type: string
+              qr_code_image:
+                type: string
+              qr_code_value:
+                type: string
+            type: object
+        "500":
+          description: Gagal membuat QR Code
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate QR Code untuk Attendance
+      tags:
+      - Admin
+  /attendance/my-history:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil seluruh riwayat absensi untuk user yang sedang login
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Riwayat absensi berhasil diambil
+          schema:
+            items:
+              $ref: '#/definitions/models.Attendance'
+            type: array
+        "401":
+          description: Tidak terautentikasi atau token tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil riwayat absensi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get My Attendance History
+      tags:
+      - Attendance
+  /attendance/scan:
+    post:
+      consumes:
+      - application/json
+      description: Melakukan scan QR code untuk proses check-in atau check-out karyawan
+      parameters:
+      - description: Data QR Code scan
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/models.QRCodeScanPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil check-in/check-out
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "201":
+          description: Berhasil check-in
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Payload tidak valid atau QR Code bermasalah
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: QR Code tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "409":
+          description: Sudah melakukan check-in dan check-out
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal melakukan check-in/check-out
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Scan QR Code untuk Check-in/Check-out
+      tags:
+      - Attendance
+  /attendance/today:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar kehadiran karyawan untuk hari ini dengan detail
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar kehadiran hari ini berhasil diambil
+          schema:
+            items:
+              $ref: '#/definitions/models.AttendanceWithUser'
+            type: array
+        "500":
+          description: Gagal mengambil daftar kehadiran
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Today's Attendance List
       tags:
       - Admin
   /auth/login:
@@ -256,7 +753,7 @@ paths:
       description: Melakukan proses login dan mengembalikan token PASETO jika email
         dan password valid
       parameters:
-      - description: Login credentials
+      - description: Kredensial untuk Login
         in: body
         name: credentials
         required: true
@@ -268,19 +765,37 @@ paths:
         "200":
           description: Login berhasil
           schema:
-            $ref: '#/definitions/models.LoginSuccessResponse'
+            properties:
+              message:
+                type: string
+              token:
+                type: string
+              user:
+                $ref: '#/definitions/models.User'
+            type: object
         "400":
-          description: Invalid request body
+          description: Payload tidak valid atau validation error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
         "401":
-          description: Email tidak ditemukan atau password salah
+          description: Kombinasi email dan password salah
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "500":
-          description: Gagal menemukan user atau gagal membuat token
+          description: Error internal server
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       summary: Login User
       tags:
       - Auth
@@ -288,7 +803,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Mendaftarkan user baru (hanya admin yang dapat melakukan registrasi)
+      description: Mendaftarkan user baru (admin only)
       parameters:
       - description: Data registrasi user
         in: body
@@ -302,18 +817,273 @@ paths:
         "201":
           description: User berhasil didaftarkan
           schema:
-            $ref: '#/definitions/models.RegisterSuccessResponse'
+            properties:
+              message:
+                type: string
+              user_id:
+                type: string
+            type: object
         "400":
           description: Invalid request body atau validation error
           schema:
-            $ref: '#/definitions/models.ValidationErrorResponse'
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
         "500":
           description: Gagal hash password atau gagal mendaftarkan user
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
       summary: Register User
       tags:
       - Auth
+  /departments:
+    get:
+      consumes:
+      - application/json
+      description: Mendapatkan daftar semua departemen
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar departemen berhasil diambil
+          schema:
+            items:
+              $ref: '#/definitions/models.Department'
+            type: array
+        "500":
+          description: Gagal mengambil departemen
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get All Departments
+      tags:
+      - Departments
+  /departments/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mendapatkan detail departemen berdasarkan ID
+      parameters:
+      - description: Department ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Departemen berhasil ditemukan
+          schema:
+            $ref: '#/definitions/models.Department'
+        "400":
+          description: Invalid ID format
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Departemen tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil departemen
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Department by ID
+      tags:
+      - Departments
+  /leave-requests:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua pengajuan izin/cuti/sakit (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar pengajuan berhasil diambil
+          schema:
+            items:
+              $ref: '#/definitions/models.LeaveRequest'
+            type: array
+        "500":
+          description: Gagal mengambil data pengajuan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get All Leave Requests
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Membuat pengajuan izin/cuti/sakit baru
+      parameters:
+      - description: Data pengajuan izin
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/models.LeaveRequestCreatePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Pengajuan berhasil dibuat
+          schema:
+            $ref: '#/definitions/models.LeaveRequest'
+        "400":
+          description: Payload tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal membuat pengajuan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create Leave Request
+      tags:
+      - Leave Request
+  /leave-requests/{id}/attachment:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Mengunggah file lampiran untuk pengajuan izin/cuti/sakit
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: File lampiran
+        in: formData
+        name: attachment
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File berhasil diunggah
+          schema:
+            properties:
+              file_url:
+                type: string
+              message:
+                type: string
+            type: object
+        "400":
+          description: ID tidak valid atau file tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal menyimpan file
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload Attachment for Leave Request
+      tags:
+      - Leave Request
+  /leave-requests/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui status pengajuan izin/cuti/sakit (admin only)
+      parameters:
+      - description: Leave Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update status
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/models.LeaveRequestUpdatePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Status pengajuan berhasil diperbarui
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: ID tidak valid atau payload tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Pengajuan tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal memperbarui status
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update Leave Request Status
+      tags:
+      - Admin
   /users/{id}:
     get:
       consumes:
@@ -332,27 +1102,42 @@ paths:
         "200":
           description: User berhasil ditemukan
           schema:
-            $ref: '#/definitions/models.GetUserSuccessResponse'
+            $ref: '#/definitions/models.User'
         "400":
           description: Invalid user ID format
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "401":
           description: Tidak terautentikasi
           schema:
-            $ref: '#/definitions/models.UnauthorizedErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "403":
           description: Akses ditolak - hanya bisa melihat data sendiri
           schema:
-            $ref: '#/definitions/models.ForbiddenErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "404":
           description: User tidak ditemukan
           schema:
-            $ref: '#/definitions/models.NotFoundErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "500":
-          description: Gagal mengambil data user
+          description: Internal server error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Get User by ID
@@ -381,30 +1166,119 @@ paths:
         "200":
           description: User berhasil diupdate
           schema:
-            $ref: '#/definitions/models.UpdateUserSuccessResponse'
+            properties:
+              message:
+                type: string
+            type: object
         "400":
-          description: Invalid request body atau user ID
+          description: Invalid request body, user ID, atau validation error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
         "401":
           description: Tidak terautentikasi
           schema:
-            $ref: '#/definitions/models.UnauthorizedErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "403":
           description: Akses ditolak - hanya bisa update data sendiri
           schema:
-            $ref: '#/definitions/models.ForbiddenErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "404":
           description: User tidak ditemukan
           schema:
-            $ref: '#/definitions/models.NotFoundErrorResponse'
+            properties:
+              message:
+                type: string
+            type: object
         "500":
-          description: Gagal update user
+          description: Internal server error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Update User
+      tags:
+      - Users
+  /users/{id}/upload-photo:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Mengunggah foto profil untuk user tertentu. Hanya admin atau user
+        itu sendiri yang bisa mengunggah.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: File foto profil (JPG, PNG, GIF, WEBP, maks 5MB)
+        in: formData
+        name: photo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Foto profil berhasil diunggah
+          schema:
+            properties:
+              message:
+                type: string
+              photo_url:
+                type: string
+            type: object
+        "400":
+          description: Invalid file format, file size, atau no file uploaded
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Akses ditolak
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: User tidak ditemukan
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload User Profile Photo
       tags:
       - Users
   /users/change-password:
@@ -425,19 +1299,33 @@ paths:
         "200":
           description: Password berhasil diubah
           schema:
-            $ref: '#/definitions/models.ChangePasswordSuccessResponse'
+            properties:
+              message:
+                type: string
+            type: object
         "400":
-          description: Invalid request body
+          description: Invalid request body atau validation error
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+              errors:
+                type: array
+            type: object
         "401":
           description: Tidak terautentikasi atau password lama tidak cocok
           schema:
-            $ref: '#/definitions/models.UnauthorizedErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
         "500":
           description: User tidak ditemukan atau gagal update
           schema:
-            $ref: '#/definitions/models.ErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Change Password

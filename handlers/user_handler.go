@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/pkg/utils"
+	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
 )
 
@@ -36,12 +36,12 @@ func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Success 200 {object} models.GetUserSuccessResponse "User berhasil ditemukan"
-// @Failure 400 {object} fiber.Map "Invalid user ID format"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
-// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa melihat data sendiri"
-// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
-// @Failure 500 {object} fiber.Map "Internal server error"
+// @Success 200 {object} models.User "User berhasil ditemukan"
+// @Failure 400 {object} object{error=string} "Invalid user ID format"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 403 {object} object{error=string} "Akses ditolak - hanya bisa melihat data sendiri"
+// @Failure 404 {object} object{error=string} "User tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Internal server error"
 // @Router /users/{id} [get]
 func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 	idParam := c.Params("id")
@@ -76,16 +76,20 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 }
 
 // GetAllUsers godoc
-// @Summary Get All Users (Admin Only)
-// @Description Mendapatkan semua data users - hanya admin yang dapat mengakses endpoint ini
+// @Summary Get All Users
+// @Description Mendapatkan semua data users dengan pagination dan filter (admin only)
 // @Tags Admin
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} models.GetAllUsersSuccessResponse "Data users berhasil diambil"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
-// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya admin"
-// @Failure 500 {object} models.ErrorResponse "Gagal mengambil data users"
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 10, max: 100)"
+// @Param search query string false "Search by name or email"
+// @Param role query string false "Filter by role"
+// @Success 200 {object} object{data=array,total=int,page=int,limit=int} "Data users berhasil diambil"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 403 {object} object{error=string} "Akses ditolak - hanya admin"
+// @Failure 500 {object} object{error=string} "Gagal mengambil data users"
 // @Router /admin/users [get]
 func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
@@ -139,12 +143,12 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Param user body models.UserUpdatePayload true "Data update user"
-// @Success 200 {object} models.UpdateUserSuccessResponse "User berhasil diupdate"
-// @Failure 400 {object} fiber.Map "Invalid request body atau user ID"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
-// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya bisa update data sendiri"
-// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
-// @Failure 500 {object} fiber.Map "Internal server error"
+// @Success 200 {object} object{message=string} "User berhasil diupdate"
+// @Failure 400 {object} object{error=string,errors=array} "Invalid request body, user ID, atau validation error"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 403 {object} object{error=string} "Akses ditolak - hanya bisa update data sendiri"
+// @Failure 404 {object} object{message=string} "User tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Internal server error"
 // @Router /users/{id} [put]
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")
@@ -230,6 +234,19 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user berhasil diupdate"})
 }
 
+// DeleteUser godoc
+// @Summary Delete User
+// @Description Menghapus user berdasarkan ID (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {object} object{message=string} "User berhasil dihapus"
+// @Failure 400 {object} object{error=string} "Invalid ID format"
+// @Failure 404 {object} object{message=string} "User tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal menghapus user"
+// @Router /admin/users/{id} [delete]
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(idParam)
@@ -253,15 +270,15 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 
 // GetDashboardStats godoc
 // @Summary Get Dashboard Statistics
-// @Description Mendapatkan berbagai statistik untuk dashboard admin (hanya admin yang dapat mengakses)
+// @Description Mendapatkan berbagai statistik untuk dashboard admin (admin only)
 // @Tags Admin
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} models.DashboardStats "Statistik dashboard berhasil diambil"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
-// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak - hanya admin"
-// @Failure 500 {object} fiber.Map "Internal server error"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 403 {object} object{error=string} "Akses ditolak - hanya admin"
+// @Failure 500 {object} object{error=string} "Gagal mengambil statistik dashboard"
 // @Router /admin/dashboard-stats [get]
 func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
@@ -274,7 +291,7 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(stats)
 }
 
-// NEW: UploadProfilePhoto menangani upload foto profil user
+// UploadProfilePhoto godoc
 // @Summary Upload User Profile Photo
 // @Description Mengunggah foto profil untuk user tertentu. Hanya admin atau user itu sendiri yang bisa mengunggah.
 // @Tags Users
@@ -282,13 +299,13 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param photo formData file true "File foto profil (JPG, PNG, maks 5MB)"
-// @Success 200 {object} fiber.Map "message: Foto profil berhasil diunggah, photo_url: URL foto baru"
-// @Failure 400 {object} fiber.Map "error: Invalid file format, file size, or no file uploaded"
-// @Failure 401 {object} models.UnauthorizedErrorResponse "Tidak terautentikasi"
-// @Failure 403 {object} models.ForbiddenErrorResponse "Akses ditolak"
-// @Failure 404 {object} models.NotFoundErrorResponse "User tidak ditemukan"
-// @Failure 500 {object} fiber.Map "error: Internal server error"
+// @Param photo formData file true "File foto profil (JPG, PNG, GIF, WEBP, maks 5MB)"
+// @Success 200 {object} object{message=string,photo_url=string} "Foto profil berhasil diunggah"
+// @Failure 400 {object} object{error=string} "Invalid file format, file size, atau no file uploaded"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 403 {object} object{error=string} "Akses ditolak"
+// @Failure 404 {object} object{message=string} "User tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Internal server error"
 // @Router /users/{id}/upload-photo [post]
 func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 	userID := c.Params("id")
