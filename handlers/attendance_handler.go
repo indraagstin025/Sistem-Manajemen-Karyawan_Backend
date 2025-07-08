@@ -3,7 +3,6 @@ package handlers
 import (
 	"context" // Pastikan ini diimpor
 	"encoding/base64"
-	"fmt" // Ini boleh tetap ada untuk error formatting, atau hapus jika tidak digunakan
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,85 +22,97 @@ func NewAttendanceHandler(repo repository.AttendanceRepository) *AttendanceHandl
     return &AttendanceHandler{repo: repo}
 }
 
+
 func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
     var payload models.QRCodeScanPayload
     if err := c.BodyParser(&payload); err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid: " + err.Error()})
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "Payload tidak valid: " + err.Error(),
+        })
     }
 
-    // --- LINE 34 & 62: FindQRCodeByValue sekarang menerima context ---
     qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
     if err != nil {
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()}) // Menggunakan err.Error() dari repo
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Terjadi kesalahan saat mencari QR Code: " + err.Error(),
+        })
+    }
+    if qrCode == nil {
+        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+            "error": "QR Code tidak ditemukan atau tidak valid.",
+        })
     }
 
+    // Validasi kadaluarsa dan tanggal QR
     if time.Now().After(qrCode.ExpiresAt) {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code sudah kadaluarsa."})
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "QR Code sudah kadaluarsa.",
+        })
     }
 
     today := time.Now().Format("2006-01-02")
     if qrCode.Date != today {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code ini tidak berlaku untuk hari ini."})
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "QR Code ini tidak berlaku untuk hari ini.",
+        })
     }
 
+    // Validasi ID user
     userID, err := primitive.ObjectIDFromHex(payload.UserID)
     if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User ID tidak valid."})
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": "User ID tidak valid.",
+        })
     }
 
-    for _, usedID := range qrCode.UsedBy {
-        if usedID == userID {
-            return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Anda sudah menggunakan QR Code ini untuk absensi."})
-        }
-    }
-
-    // --- LINE 67: FindAttendanceByUserAndDate sekarang menerima context ---
+    // Cek apakah user sudah absen hari ini
     attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
-    if err == nil { // User sudah check-in hari ini
-        if attendance.CheckOut == "" { // Belum check-out
+    if err == nil && attendance != nil {
+        if attendance.CheckOut == "" {
+            // ✅ Proses CHECK-OUT
             currentTime := time.Now().Format("15:04")
-            // --- LINE 71: UpdateAttendanceCheckout sekarang menerima context dan primitive.ObjectID ---
             _, err := h.repo.UpdateAttendanceCheckout(c.Context(), attendance.ID, currentTime)
             if err != nil {
-                return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan check-out: " + err.Error()})
+                return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+                    "error": "Gagal melakukan check-out: " + err.Error(),
+                })
             }
-            // --- LINE 75: MarkQRCodeAsUsed sekarang menerima context dan primitive.ObjectID ---
-            _, err = h.repo.MarkQRCodeAsUsed(c.Context(), qrCode.ID, userID)
-            if err != nil {
-                // Log error tapi mungkin tidak menghentikan respon berhasil check-out
-                fmt.Printf("Peringatan: Gagal menandai QR Code sebagai sudah digunakan: %v\n", err)
-            }
-            return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Berhasil check-out pukul " + currentTime})
-        } else { // Sudah check-in dan check-out
-            return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Anda sudah melakukan check-in dan check-out hari ini."})
+            return c.Status(fiber.StatusOK).JSON(fiber.Map{
+                "message": "Berhasil check-out pukul " + currentTime,
+            })
+        } else {
+            // ❌ Sudah check-in dan check-out
+            return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+                "error": "Anda sudah melakukan check-in dan check-out hari ini.",
+            })
         }
     }
 
-    // Jika belum check-in hari ini, buat absensi baru
+    // ✅ Proses CHECK-IN (belum ada absensi hari ini)
     newAttendance := models.Attendance{
         ID:        primitive.NewObjectID(),
         UserID:    userID,
         Date:      today,
         CheckIn:   time.Now().Format("15:04"),
-        CheckOut:  "", // Awalnya kosong untuk check-out
-        Status:    "Hadir",
+        CheckOut:  "",
+        Status:    "Hadir", // default hadir
         CreatedAt: time.Now(),
         UpdatedAt: time.Now(),
     }
 
-    // --- LINE 91: CreateAttendance sekarang menerima context ---
     _, err = h.repo.CreateAttendance(c.Context(), &newAttendance)
     if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan check-in: " + err.Error()})
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Gagal melakukan check-in: " + err.Error(),
+        })
     }
 
-    // --- LINE 96: MarkQRCodeAsUsed sekarang menerima context dan primitive.ObjectID ---
-    _, err = h.repo.MarkQRCodeAsUsed(c.Context(), qrCode.ID, userID)
-    if err != nil {
-        fmt.Printf("Peringatan: Gagal menandai QR Code sebagai sudah digunakan: %v\n", err)
-    }
-    return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Berhasil check-in pukul " + newAttendance.CheckIn})
+    return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+        "message": "Berhasil check-in pukul " + newAttendance.CheckIn,
+    })
 }
+
+
 
 
 func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
@@ -143,7 +154,6 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
         Code:      uniqueCode,
         Date:      todayStr,
         ExpiresAt: expiresAt, // <-- Pastikan menggunakan expiresAt yang baru dihitung
-        UsedBy:    []primitive.ObjectID{},
         CreatedAt: currentTime,
         UpdatedAt: currentTime,
     }
