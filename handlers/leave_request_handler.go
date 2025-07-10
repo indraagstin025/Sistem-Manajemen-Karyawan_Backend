@@ -211,7 +211,7 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 
 	uniqueFileName := fmt.Sprintf("%d-%s", time.Now().Unix(), file.Filename)
 	filePath := fmt.Sprintf("./uploads/attachments/%s", uniqueFileName)
-	fileURL := fmt.Sprintf("uploads/attachments/%s", uniqueFileName) // URL relatif untuk disimpan di DB
+	fileURL := fmt.Sprintf("uploads/attachments/%s", uniqueFileName) 
 
 	if err := c.SaveFile(file, filePath); err != nil {
 		log.Printf("ERROR: Gagal menyimpan file lampiran ke disk: %v", err)
