@@ -143,63 +143,22 @@ func (r *UserRepository) UpdateUserFirstLoginStatus(ctx context.Context, id prim
 	return nil
 }
 
-func (r *UserRepository) GetDashboardStats(ctx context.Context) (*models.DashboardStats, error) {
 
-	totalUsers, err := r.collection.CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return nil, fmt.Errorf("gagal menghitung total karyawan: %w", err)
-	}
 
-	activeUsers, err := r.collection.CountDocuments(ctx, bson.M{"role": "karyawan"})
-	if err != nil {
-		return nil, fmt.Errorf("gagal menghitung karyawan aktif: %w", err)
-	}
+// CountDocuments adalah fungsi umum untuk menghitung dokumen berdasarkan filter
+func (r *UserRepository) CountDocuments(ctx context.Context, filter bson.M) (int64, error) {
+    count, err := r.collection.CountDocuments(ctx, filter)
+    if err != nil {
+        return 0, fmt.Errorf("gagal menghitung dokumen dari koleksi user: %w", err)
+    }
+    return count, nil
+}
 
-	leaveUsers := int64(0)
-
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
-	newPositions, err := r.collection.CountDocuments(ctx, bson.M{"created_at": bson.M{"$gte": thirtyDaysAgo}})
-	if err != nil {
-		return nil, fmt.Errorf("gagal menghitung posisi baru: %w", err)
-	}
-
-	pipeline := []bson.M{
-		{"$match": bson.M{"department": bson.M{"$ne": ""}}},
-		{"$group": bson.M{
-			"_id":   "$department",
-			"count": bson.M{"$sum": 1},
-		}},
-		{"$project": bson.M{
-			"department": "$_id",
-			"count":      1,
-			"_id":        0,
-		}},
-	}
-
-	cursor, err := r.collection.Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, fmt.Errorf("gagal melakukan agregasi distribusi departemen: %w", err)
-	}
-	defer cursor.Close(ctx)
-
-	var departmentCounts []models.DepartmentCount
-	if err = cursor.All(ctx, &departmentCounts); err != nil {
-		return nil, fmt.Errorf("gagal mendecode distribusi departemen: %w", err)
-	}
-
-	latestActivities := []string{
-		"Sistem HR-System dimulai.",
-		"Admin login ke dashboard.",
-	}
-
-	stats := &models.DashboardStats{
-		TotalKaryawan:        totalUsers,
-		KaryawanAktif:        activeUsers,
-		KaryawanCuti:         leaveUsers,
-		PosisiBaru:           newPositions,
-		DistribusiDepartemen: departmentCounts,
-		AktivitasTerbaru:     latestActivities,
-	}
-
-	return stats, nil
+// Aggregate adalah fungsi umum untuk menjalankan pipeline agregasi pada koleksi user
+func (r *UserRepository) Aggregate(ctx context.Context, pipeline mongo.Pipeline) (*mongo.Cursor, error) {
+    cursor, err := r.collection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return nil, fmt.Errorf("gagal menjalankan agregasi pada koleksi user: %w", err)
+    }
+    return cursor, nil
 }

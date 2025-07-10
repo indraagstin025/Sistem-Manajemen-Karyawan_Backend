@@ -11,7 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo" // Pastikan ini diimpor untuk mongo.Pipeline dan mongo.Cursor
 
 	"Sistem-Manajemen-Karyawan/models"
 	util "Sistem-Manajemen-Karyawan/pkg/utils"
@@ -19,12 +19,27 @@ import (
 )
 
 type UserHandler struct {
-	userRepo *repository.UserRepository
+	userRepo   *repository.UserRepository
+	deptRepo   repository.DepartmentRepository    // BARU: Tambahkan DepartmentRepository
+	leaveRepo  repository.LeaveRequestRepository  // BARU: Tambahkan LeaveRequestRepository
+	// Anda mungkin juga perlu AttendanceRepository jika ingin menghitung 'KaryawanCuti' dari absensi
+	// attendanceRepo *repository.AttendanceRepository
 }
 
-func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
+// Perbarui konstruktor untuk menginisialisasi semua repository yang dibutuhkan.
+// Pastikan parameter NewUserHandler ini sesuai dengan bagaimana Anda menginisialisasi
+// repository di file main.go Anda.
+func NewUserHandler(
+	userRepo *repository.UserRepository,
+	deptRepo repository.DepartmentRepository,     // Tambahkan parameter ini
+	leaveRepo repository.LeaveRequestRepository,  // Tambahkan parameter ini
+	// attendanceRepo *repository.AttendanceRepository, // Tambahkan ini jika dibutuhkan
+) *UserHandler {
 	return &UserHandler{
-		userRepo: userRepo,
+		userRepo:   userRepo,
+		deptRepo:   deptRepo,   // Inisialisasi
+		leaveRepo:  leaveRepo,  // Inisialisasi
+		// attendanceRepo: attendanceRepo, // Inisialisasi
 	}
 }
 
@@ -281,14 +296,95 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal mengambil statistik dashboard"
 // @Router /admin/dashboard-stats [get]
 func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second) // Tambahkan timeout yang cukup
+    defer cancel()
 
-	stats, err := h.userRepo.GetDashboardStats(ctx)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mengambil statistik dashboard: %v", err)})
-	}
-	return c.Status(fiber.StatusOK).JSON(stats)
+    // 1. Total Karyawan (total user di sistem)
+    totalUsers, err := h.userRepo.CountDocuments(ctx, bson.M{})
+    if err != nil {
+        log.Printf("Error menghitung total user: %v", err) // Log error
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total user."})
+    }
+
+    // 2. Karyawan Aktif (user dengan role "karyawan")
+    activeUsers, err := h.userRepo.CountDocuments(ctx, bson.M{"role": "karyawan"})
+    if err != nil {
+        log.Printf("Error menghitung karyawan aktif: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung karyawan aktif."})
+    }
+
+    // 3. Jumlah Karyawan Sedang Cuti (Placeholder, sesuaikan dengan logika riil Anda)
+    // Jika Anda ingin menghitung ini dari Attendance, pastikan Anda punya attendanceRepo di handler ini
+    karyawanCuti := int64(0) 
+
+    // 4. Pengajuan Cuti/Izin Tertunda
+    // Memastikan h.leaveRepo ada dan method CountPendingRequests tersedia
+    pendingLeavesCount, err := h.leaveRepo.CountPendingRequests(ctx)
+    if err != nil {
+        log.Printf("Error menghitung pengajuan tertunda: %v", err)
+        pendingLeavesCount = 0 // Tetapkan 0 jika terjadi error
+    }
+
+    // 5. Posisi Baru (karyawan yang dibuat dalam 30 hari terakhir)
+    thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+    newPositions, err := h.userRepo.CountDocuments(ctx, bson.M{"created_at": bson.M{"$gte": thirtyDaysAgo}})
+    if err != nil {
+        log.Printf("Error menghitung posisi baru: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung posisi baru."})
+    }
+
+    // 6. Distribusi Departemen (Total Departemen dan hitungan per departemen)
+    // Memastikan h.deptRepo ada dan method CountDocuments tersedia
+    totalDepartemen, err := h.deptRepo.CountDocuments(ctx, bson.M{}) // Asumsi ada CountDocuments di deptRepo
+    if err != nil {
+        log.Printf("Error menghitung total departemen: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total departemen."})
+    }
+
+    pipeline := mongo.Pipeline{ 
+        bson.D{{Key: "$match", Value: bson.D{{Key: "department", Value: bson.D{{Key: "$ne", Value: ""}}}}}},
+        bson.D{{Key: "$group", Value: bson.D{
+            {Key: "_id",    Value: "$department"},
+            {Key: "count",  Value: bson.D{{Key: "$sum", Value: 1}}},
+        }}},
+        bson.D{{Key: "$project", Value: bson.D{
+            {Key: "department", Value: "$_id"},
+            {Key: "count",      Value: 1},
+            {Key: "_id",        Value: 0},
+        }}},
+    }
+
+    cursor, err := h.userRepo.Aggregate(ctx, pipeline)
+    if err != nil {
+        log.Printf("Error melakukan agregasi distribusi departemen: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan agregasi distribusi departemen."})
+    }
+    defer cursor.Close(ctx)
+
+    var departmentDistribution []models.DepartmentCount
+    if err = cursor.All(ctx, &departmentDistribution); err != nil {
+        log.Printf("Error mendecode distribusi departemen: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mendecode distribusi departemen."})
+    }
+
+    // 7. Aktivitas Terbaru (contoh statis)
+    latestActivities := []string{
+        "Sistem HR-System dimulai.",
+        "Admin login ke dashboard.",
+    }
+
+    stats := &models.DashboardStats{
+        TotalKaryawan:             totalUsers,
+        KaryawanAktif:             activeUsers,
+        KaryawanCuti:              karyawanCuti,
+        PendingLeaveRequestsCount: pendingLeavesCount,
+        PosisiBaru:                newPositions,
+        TotalDepartemen:           totalDepartemen,
+        DistribusiDepartemen:      departmentDistribution,
+        AktivitasTerbaru:          latestActivities,
+    }
+
+    return c.Status(fiber.StatusOK).JSON(stats)
 }
 
 // UploadProfilePhoto godoc

@@ -23,7 +23,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Inisialisasi Handlers
 	authHandler := handlers.NewAuthHandler(userRepo)
-	userHandler := handlers.NewUserHandler(userRepo)
+	userHandler := handlers.NewUserHandler(userRepo, deptRepo, leaveRepo)
 	deptHandler := handlers.NewDepartmentHandler(deptRepo)
 	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo)
 	leaveHandler := handlers.NewLeaveRequestHandler(leaveRepo, attendanceRepo)
@@ -87,6 +87,7 @@ func SetupRoutes(app *fiber.App) {
 	leaveGroup := api.Group("/leave-requests", middleware.AuthMiddleware())
 	leaveGroup.Post("/", leaveHandler.CreateLeaveRequest)
 	leaveGroup.Post("/:id/attachment", leaveHandler.UploadAttachment)
+	leaveGroup.Get("/my-requests", leaveHandler.GetMyLeaveRequests) 
 	adminLeaveGroup := leaveGroup.Group("/", middleware.AdminMiddleware())
 	adminLeaveGroup.Get("/", leaveHandler.GetAllLeaveRequests)
 	adminLeaveGroup.Put("/:id/status", leaveHandler.UpdateLeaveRequestStatus)

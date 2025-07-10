@@ -14,6 +14,7 @@ import (
 	"Sistem-Manajemen-Karyawan/models"
 )
 
+// Perbarui interface DepartmentRepository
 type DepartmentRepository interface {
 	CreateDepartment(ctx context.Context, department *models.Department) (*mongo.InsertOneResult, error)
 	GetAllDepartments(ctx context.Context) ([]models.Department, error)
@@ -21,6 +22,7 @@ type DepartmentRepository interface {
 	UpdateDepartment(ctx context.Context, id primitive.ObjectID, updateData bson.M) (*mongo.UpdateResult, error)
 	DeleteDepartment(ctx context.Context, id primitive.ObjectID) (*mongo.DeleteResult, error)
 	FindDepartmentByName(ctx context.Context, name string) (*models.Department, error)
+	CountDocuments(ctx context.Context, filter bson.M) (int64, error) // <--- BARU: Tambahkan method ini ke interface
 }
 
 type departmentRepository struct {
@@ -28,7 +30,6 @@ type departmentRepository struct {
 }
 
 func NewDepartmentRepository() DepartmentRepository {
-
 	return &departmentRepository{
 		collection: config.GetCollection(config.DepartmentCollection),
 	}
@@ -109,4 +110,13 @@ func (r *departmentRepository) FindDepartmentByName(ctx context.Context, name st
 		return nil, fmt.Errorf("gagal menemukan departemen berdasarkan nama: %w", err)
 	}
 	return &department, nil
+}
+
+// <--- BARU: Implementasi method CountDocuments untuk tipe *departmentRepository
+func (r *departmentRepository) CountDocuments(ctx context.Context, filter bson.M) (int64, error) {
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("gagal menghitung dokumen dari koleksi departemen: %w", err)
+	}
+	return count, nil
 }
