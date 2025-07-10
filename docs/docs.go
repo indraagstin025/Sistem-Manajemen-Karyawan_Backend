@@ -1047,11 +1047,11 @@ const docTemplate = `{
                 "summary": "Get All Leave Requests",
                 "responses": {
                     "200": {
-                        "description": "Daftar pengajuan berhasil diambil",
+                        "description": "Daftar pengajuan berhasil diambil dengan detail user",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.LeaveRequest"
+                                "$ref": "#/definitions/models.LeaveRequestWithUser"
                             }
                         }
                     },
@@ -1127,6 +1127,59 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Gagal membuat pengajuan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leave-requests/my-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil semua pengajuan cuti/izin/sakit untuk karyawan yang sedang login",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Leave Request"
+                ],
+                "summary": "Get Leave Requests for current user",
+                "responses": {
+                    "200": {
+                        "description": "Daftar pengajuan berhasil diambil",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.LeaveRequest"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil data pengajuan",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1796,7 +1849,15 @@ const docTemplate = `{
                 "karyawan_cuti": {
                     "type": "integer"
                 },
+                "pending_leave_requests_count": {
+                    "description": "\u003c-- BARU: Untuk jumlah pengajuan tertunda",
+                    "type": "integer"
+                },
                 "posisi_baru": {
+                    "type": "integer"
+                },
+                "total_departemen": {
+                    "description": "Tambahkan ini juga jika belum ada hitungan di handler",
                     "type": "integer"
                 },
                 "total_karyawan": {
@@ -1854,7 +1915,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "request_type": {
-                    "description": "TAMBAHAN: \"Cuti\", \"Sakit\", \"Izin\"",
+                    "description": "\"Cuti\", \"Sakit\", \"Izin\"",
                     "type": "string"
                 },
                 "start_date": {
@@ -1890,7 +1951,6 @@ const docTemplate = `{
                     "minLength": 10
                 },
                 "request_type": {
-                    "description": "TAMBAHAN",
                     "type": "string",
                     "enum": [
                         "Cuti",
@@ -1922,6 +1982,57 @@ const docTemplate = `{
                         "approved",
                         "rejected"
                     ]
+                }
+            }
+        },
+        "models.LeaveRequestWithUser": {
+            "type": "object",
+            "properties": {
+                "attachment_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "request_type": {
+                    "description": "\"Cuti\", \"Sakit\", \"Izin\"",
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "description": "\u003c--- UBAH DARI \"user_info.email\" MENJADI \"user_email\"",
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "description": "\u003c--- UBAH DARI \"user_info.name\" MENJADI \"user_name\"",
+                    "type": "string"
+                },
+                "user_photo": {
+                    "description": "\u003c--- UBAH DARI \"user_info.photo\" MENJADI \"user_photo\"",
+                    "type": "string"
                 }
             }
         },

@@ -74,7 +74,13 @@ definitions:
         type: integer
       karyawan_cuti:
         type: integer
+      pending_leave_requests_count:
+        description: '<-- BARU: Untuk jumlah pengajuan tertunda'
+        type: integer
       posisi_baru:
+        type: integer
+      total_departemen:
+        description: Tambahkan ini juga jika belum ada hitungan di handler
         type: integer
       total_karyawan:
         type: integer
@@ -112,7 +118,7 @@ definitions:
       reason:
         type: string
       request_type:
-        description: 'TAMBAHAN: "Cuti", "Sakit", "Izin"'
+        description: '"Cuti", "Sakit", "Izin"'
         type: string
       start_date:
         type: string
@@ -132,7 +138,6 @@ definitions:
         minLength: 10
         type: string
       request_type:
-        description: TAMBAHAN
         enum:
         - Cuti
         - Sakit
@@ -161,6 +166,41 @@ definitions:
         type: string
     required:
     - status
+    type: object
+  models.LeaveRequestWithUser:
+    properties:
+      attachment_url:
+        type: string
+      created_at:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+      request_type:
+        description: '"Cuti", "Sakit", "Izin"'
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_email:
+        description: <--- UBAH DARI "user_info.email" MENJADI "user_email"
+        type: string
+      user_id:
+        type: string
+      user_name:
+        description: <--- UBAH DARI "user_info.name" MENJADI "user_name"
+        type: string
+      user_photo:
+        description: <--- UBAH DARI "user_info.photo" MENJADI "user_photo"
+        type: string
     type: object
   models.QRCodeScanPayload:
     properties:
@@ -924,10 +964,10 @@ paths:
       - application/json
       responses:
         "200":
-          description: Daftar pengajuan berhasil diambil
+          description: Daftar pengajuan berhasil diambil dengan detail user
           schema:
             items:
-              $ref: '#/definitions/models.LeaveRequest'
+              $ref: '#/definitions/models.LeaveRequestWithUser'
             type: array
         "500":
           description: Gagal mengambil data pengajuan
@@ -1085,6 +1125,40 @@ paths:
       summary: Update Leave Request Status
       tags:
       - Admin
+  /leave-requests/my-requests:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua pengajuan cuti/izin/sakit untuk karyawan yang sedang
+        login
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar pengajuan berhasil diambil
+          schema:
+            items:
+              $ref: '#/definitions/models.LeaveRequest'
+            type: array
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil data pengajuan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Leave Requests for current user
+      tags:
+      - Leave Request
   /users/{id}:
     get:
       consumes:
