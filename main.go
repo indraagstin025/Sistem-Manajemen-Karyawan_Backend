@@ -82,3 +82,4 @@ func main() {
 	log.Printf("CORS enabled for origins: %v", config.GetAllowedOrigins()) // Pastikan GetAllowedOrigins() ada
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
+
