@@ -464,7 +464,7 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file foto."})
 	}
 
-	photoURL := fmt.Sprintf("http://localhost:3000/uploads/%s", fileName)
+	photoURL := fmt.Sprintf("https://sistem-manajemen-karyawanbackend-production.up.railway.app/uploads/%s", fileName)
 
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
