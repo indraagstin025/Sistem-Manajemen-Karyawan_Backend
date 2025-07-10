@@ -48,28 +48,28 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid atau sesi rusak"})
 	}
 
-	// Mengambil data dari form-data (bukan JSON body)
+	// Ambil data form
 	requestType := c.FormValue("request_type")
 	startDate := c.FormValue("start_date")
 	endDate := c.FormValue("end_date")
 	reason := c.FormValue("reason")
 
-	// Validasi dasar field wajib (non-file)
 	if requestType == "" || startDate == "" || endDate == "" || reason == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan, tanggal mulai, tanggal selesai, dan alasan wajib diisi."})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Jenis pengajuan, tanggal mulai, tanggal selesai, dan alasan wajib diisi.",
+		})
 	}
 
 	var attachmentURL string
-	file, err := c.FormFile("attachment")
+	file, _ := c.FormFile("attachment")
 
-	// Logika penanganan dan validasi file lampiran
-	if file != nil { // Jika ada file yang diunggah
-		// Validasi ukuran file (maks 2MB, sesuai frontend)
+	if file != nil {
+		// Validasi ukuran maksimal 2MB
 		if file.Size > 2*1024*1024 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Ukuran file lampiran terlalu besar. Maksimal 2MB."})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Ukuran file maksimal 2MB"})
 		}
 
-		// Validasi tipe file
+		// Validasi ekstensi file
 		allowedExtensions := map[string]bool{
 			".pdf":  true,
 			".doc":  true,
@@ -80,60 +80,72 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		}
 		ext := strings.ToLower(filepath.Ext(file.Filename))
 		if !allowedExtensions[ext] {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file lampiran tidak didukung. Hanya PDF, DOC/DOCX, JPG, PNG."})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung"})
 		}
 
-		// Validasi khusus untuk jenis 'Sakit': harus PDF
+		// Validasi khusus untuk Sakit (harus PDF)
 		if requestType == "Sakit" && ext != ".pdf" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Untuk pengajuan Sakit, lampiran harus berupa file PDF."})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan Sakit harus berupa file PDF"})
 		}
 
-		// Simpan file ke disk
-		uniqueFileName := fmt.Sprintf("%d-%s%s", time.Now().Unix(), strings.ReplaceAll(file.Filename[:len(file.Filename)-len(ext)], " ", "_"), ext)
-		filePath := fmt.Sprintf("./uploads/attachments/%s", uniqueFileName)
-		attachmentURL = fmt.Sprintf("/uploads/attachments/%s", uniqueFileName)
+		// Upload file ke GridFS
+		bucket, err := config.GetGridFSBucket()
+		if err != nil {
+			log.Printf("ERROR: Gagal mendapatkan bucket GridFS: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses penyimpanan file"})
+		}
 
-		if err := c.SaveFile(file, filePath); err != nil {
-			log.Printf("ERROR: Gagal menyimpan file lampiran ke disk: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menyimpan file lampiran: %v", err)})
+		src, err := file.Open()
+		if err != nil {
+			log.Printf("ERROR: Gagal membuka file: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuka file"})
 		}
-	} else if requestType == "Sakit" { // Jika jenisnya Sakit TAPI tidak ada file
-		// Ini adalah kondisi di mana file attachment WAJIB untuk 'Sakit'
-		// Error ini akan terpicu jika file tidak ada sama sekali atau ada masalah saat membaca form file
-		if err != nil && strings.Contains(err.Error(), "no such file") { // Pastikan errornya memang karena tidak ada file
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Untuk pengajuan Sakit, lampiran (surat dokter) wajib diunggah."})
-		} else if err != nil { // Error lain saat memproses file
-			log.Printf("ERROR: Terjadi error saat membaca file attachment: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal memproses lampiran: %v", err)})
+		defer src.Close()
+
+		uploadFileName := fmt.Sprintf("%d_%s", time.Now().Unix(), strings.ReplaceAll(file.Filename, " ", "_"))
+		uploadStream, err := bucket.OpenUploadStream(uploadFileName)
+		if err != nil {
+			log.Printf("ERROR: Gagal membuka stream GridFS: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal upload file"})
 		}
-		// Jika file == nil dan err == nil (misal field attachment kosong tapi tidak wajib), maka ini ok
+		defer uploadStream.Close()
+
+		if _, err := io.Copy(uploadStream, src); err != nil {
+			log.Printf("ERROR: Gagal menyalin ke GridFS: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file"})
+		}
+
+		attachmentURL = fmt.Sprintf("/api/v1/files/%s", uploadStream.FileID.(primitive.ObjectID).Hex())
+	} else if requestType == "Sakit" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Lampiran wajib untuk pengajuan Sakit"})
 	}
-	// Jika requestType BUKAN Sakit, maka file tidak wajib, jadi file == nil itu tidak masalah di sini.
 
+	// Simpan data pengajuan ke database
 	newRequest := &models.LeaveRequest{
 		ID:            primitive.NewObjectID(),
 		UserID:        claims.UserID,
 		StartDate:     startDate,
 		EndDate:       endDate,
 		Reason:        reason,
-		Status:        "pending", // Status awal selalu pending
+		Status:        "pending",
 		RequestType:   requestType,
-		AttachmentURL: attachmentURL, // Simpan URL lampiran
+		AttachmentURL: attachmentURL,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
 
 	_, createErr := h.leaveRepo.Create(newRequest)
 	if createErr != nil {
-		log.Printf("ERROR: Gagal membuat pengajuan cuti/izin di database: %v", createErr)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuat pengajuan cuti/izin."})
+		log.Printf("ERROR: Gagal menyimpan leave request ke DB: %v", createErr)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan data pengajuan"})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pengajuan berhasil dikirim dan menunggu persetujuan admin.",
-		"request": newRequest, // Mengembalikan objek request yang baru dibuat
+		"message": "Pengajuan berhasil dikirim",
+		"request": newRequest,
 	})
 }
+
 
 // GetAllLeaveRequests godoc
 // @Summary Get All Leave Requests
