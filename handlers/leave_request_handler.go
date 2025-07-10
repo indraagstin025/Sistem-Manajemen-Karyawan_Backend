@@ -18,7 +18,6 @@ import (
 type LeaveRequestHandler struct {
 	leaveRepo      repository.LeaveRequestRepository
 	attendanceRepo repository.AttendanceRepository
-	
 }
 
 func NewLeaveRequestHandler(leaveRepo repository.LeaveRequestRepository, attendanceRepo repository.AttendanceRepository) *LeaveRequestHandler {
@@ -70,12 +69,12 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 
 		// Validasi tipe file
 		allowedExtensions := map[string]bool{
-			".pdf": true,
-			".doc": true,
+			".pdf":  true,
+			".doc":  true,
 			".docx": true,
-			".jpg": true,
+			".jpg":  true,
 			".jpeg": true,
-			".png": true,
+			".png":  true,
 		}
 		ext := strings.ToLower(filepath.Ext(file.Filename))
 		if !allowedExtensions[ext] {
@@ -102,25 +101,24 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		if err != nil && strings.Contains(err.Error(), "no such file") { // Pastikan errornya memang karena tidak ada file
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Untuk pengajuan Sakit, lampiran (surat dokter) wajib diunggah."})
 		} else if err != nil { // Error lain saat memproses file
-             log.Printf("ERROR: Terjadi error saat membaca file attachment: %v", err)
-             return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal memproses lampiran: %v", err)})
-        }
+			log.Printf("ERROR: Terjadi error saat membaca file attachment: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal memproses lampiran: %v", err)})
+		}
 		// Jika file == nil dan err == nil (misal field attachment kosong tapi tidak wajib), maka ini ok
 	}
-    // Jika requestType BUKAN Sakit, maka file tidak wajib, jadi file == nil itu tidak masalah di sini.
-
+	// Jika requestType BUKAN Sakit, maka file tidak wajib, jadi file == nil itu tidak masalah di sini.
 
 	newRequest := &models.LeaveRequest{
-		ID:          primitive.NewObjectID(),
-		UserID:      claims.UserID,
-		StartDate:   startDate,
-		EndDate:     endDate,
-		Reason:      reason,
-		Status:      "pending", // Status awal selalu pending
-		RequestType: requestType,
+		ID:            primitive.NewObjectID(),
+		UserID:        claims.UserID,
+		StartDate:     startDate,
+		EndDate:       endDate,
+		Reason:        reason,
+		Status:        "pending", // Status awal selalu pending
+		RequestType:   requestType,
 		AttachmentURL: attachmentURL, // Simpan URL lampiran
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	_, createErr := h.leaveRepo.Create(newRequest)
@@ -143,7 +141,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // PERBAIKAN DI SINI: Ubah tipe di Swagger doc
-// @Success 200 {array} models.LeaveRequestWithUser "Daftar pengajuan berhasil diambil dengan detail user" 
+// @Success 200 {array} models.LeaveRequestWithUser "Daftar pengajuan berhasil diambil dengan detail user"
 // @Failure 500 {object} object{error=string} "Gagal mengambil data pengajuan"
 // @Router /leave-requests [get]
 func (h *LeaveRequestHandler) GetAllLeaveRequests(c *fiber.Ctx) error {
@@ -154,7 +152,6 @@ func (h *LeaveRequestHandler) GetAllLeaveRequests(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(requests)
 }
-
 
 // GetMyLeaveRequests godoc
 // @Summary Get Leave Requests for current user
@@ -178,15 +175,6 @@ func (h *LeaveRequestHandler) GetMyLeaveRequests(c *fiber.Ctx) error {
 	if err != nil {
 		log.Printf("ERROR: Gagal mengambil pengajuan cuti untuk user %s: %v", claims.UserID.Hex(), err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal mengambil data pengajuan: %v", err)})
-	}
-
-	// Logging debug (opsional, bisa dihapus setelah masalah teratasi)
-	log.Printf("DEBUG: GetMyLeaveRequests - UserID: %s", claims.UserID.Hex())
-	log.Printf("DEBUG: GetMyLeaveRequests - requests sebelum JSON: Type=%T, Value=%+v", requests, requests)
-	if requests == nil {
-		log.Println("DEBUG: GetMyLeaveRequests - Variabel 'requests' adalah NIL")
-	} else {
-		log.Printf("DEBUG: GetMyLeaveRequests - requests Length: %d", len(requests))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(requests)
@@ -225,31 +213,19 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 	filePath := fmt.Sprintf("./uploads/attachments/%s", uniqueFileName)
 	fileURL := fmt.Sprintf("/uploads/attachments/%s", uniqueFileName) // URL relatif untuk disimpan di DB
 
-    // <--- TAMBAHKAN LOG DEBUG INI
-    log.Printf("DEBUG (UploadAttachment): Menerima lampiran untuk reqID: %s, nama file asli: %s, path penyimpanan: %s, URL yang akan disimpan: %s", reqID.Hex(), file.Filename, filePath, fileURL)
-    // --- AKHIR LOG DEBUG ---
-
 	if err := c.SaveFile(file, filePath); err != nil {
 		log.Printf("ERROR: Gagal menyimpan file lampiran ke disk: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menyimpan file: %v", err)})
 	}
 
-    // <--- TAMBAHKAN LOG DEBUG INI
-    log.Printf("DEBUG (UploadAttachment): File berhasil disimpan ke disk: %s", filePath)
-    // --- AKHIR LOG DEBUG ---
-
 	_, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-    defer cancel()
+	defer cancel()
 
-	updateResult, err := h.leaveRepo.UpdateAttachmentURL(reqID, fileURL)
+	_, err = h.leaveRepo.UpdateAttachmentURL(reqID, fileURL)
 	if err != nil {
 		log.Printf("ERROR: Gagal menyimpan URL file ke database untuk reqID %s: %v", reqID.Hex(), err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menyimpan URL file ke database: %v", err)})
 	}
-
-    // <--- TAMBAHKAN LOG DEBUG INI
-    log.Printf("DEBUG (UploadAttachment): Hasil update DB untuk reqID %s: MatchedCount=%d, ModifiedCount=%d", reqID.Hex(), updateResult.MatchedCount, updateResult.ModifiedCount)
-    // --- AKHIR LOG DEBUG ---
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message":  "File berhasil diunggah",
@@ -272,94 +248,94 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal memperbarui status"
 // @Router /leave-requests/{id}/status [put]
 func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
-    id := c.Params("id")
-    reqID, err := primitive.ObjectIDFromHex(id)
-    if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
-    }
+	id := c.Params("id")
+	reqID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
 
-    var payload models.LeaveRequestUpdatePayload
-    if err := c.BodyParser(&payload); err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
-    }
+	var payload models.LeaveRequestUpdatePayload
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
+	}
 
-    updateResult, err := h.leaveRepo.UpdateStatus(reqID, payload.Status, payload.Note)
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui status"})
-    }
+	updateResult, err := h.leaveRepo.UpdateStatus(reqID, payload.Status, payload.Note)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui status"})
+	}
 
-    if updateResult.MatchedCount == 0 {
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan dengan ID ini tidak ditemukan"})
-    }
+	if updateResult.MatchedCount == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan dengan ID ini tidak ditemukan"})
+	}
 
-    if payload.Status == "approved" {
-        request, err := h.leaveRepo.FindByID(reqID)
-        if err != nil {
-            // Periksa jika errornya karena dokumen tidak ditemukan
-            if err.Error() == "departemen tidak ditemukan" || err.Error() == "gagal menemukan pengajuan berdasarkan ID" { // Sesuaikan pesan error dari FindByID Anda
-                return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah update status."})
-            }
-            return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menemukan data pengajuan setelah diupdate: %v", err)})
-        }
-        if request == nil { // Tambahkan cek nil jika FindByID mengembalikan nil untuk tidak ditemukan
-            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah diupdate."})
-        }
+	if payload.Status == "approved" {
+		request, err := h.leaveRepo.FindByID(reqID)
+		if err != nil {
+			// Periksa jika errornya karena dokumen tidak ditemukan
+			if err.Error() == "departemen tidak ditemukan" || err.Error() == "gagal menemukan pengajuan berdasarkan ID" { // Sesuaikan pesan error dari FindByID Anda
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah update status."})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menemukan data pengajuan setelah diupdate: %v", err)})
+		}
+		if request == nil { // Tambahkan cek nil jika FindByID mengembalikan nil untuk tidak ditemukan
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah diupdate."})
+		}
 
-        startDate, _ := time.Parse("2006-01-02", request.StartDate)
-        endDate, _ := time.Parse("2006-01-02", request.EndDate)
+		startDate, _ := time.Parse("2006-01-02", request.StartDate)
+		endDate, _ := time.Parse("2006-01-02", request.EndDate)
 
-        // Logika untuk mencatat/memperbarui absensi di koleksi attendances
-        for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
-            currentDateStr := d.Format("2006-01-02")
-            
-            // Cek apakah sudah ada entri absensi untuk user dan tanggal ini
-            existingAttendance, err := h.attendanceRepo.FindAttendanceByUserAndDate(c.Context(), request.UserID, currentDateStr)
-            if err != nil {
-                log.Printf("ERROR: Gagal mencari absensi existing untuk user %s tanggal %s: %v", request.UserID.Hex(), currentDateStr, err)
-                // Lanjutkan ke tanggal berikutnya atau tangani error lebih lanjut
-                continue 
-            }
+		// Logika untuk mencatat/memperbarui absensi di koleksi attendances
+		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+			currentDateStr := d.Format("2006-01-02")
 
-            if existingAttendance == nil {
-                // Jika belum ada, buat entri absensi baru
-                attendanceRecord := &models.Attendance{
-                    ID:        primitive.NewObjectID(),
-                    UserID:    request.UserID,
-                    Date:      currentDateStr,
-                    CheckIn:   "", // Tidak ada check-in/check-out untuk cuti/sakit
-                    CheckOut:  "",
-                    Status:    request.RequestType, // Menggunakan RequestType (Sakit/Cuti/Izin)
-                    Note:      "Disetujui: " + request.Reason,
-                    CreatedAt: time.Now(),
-                    UpdatedAt: time.Now(),
-                }
-                _, err := h.attendanceRepo.CreateAttendance(c.Context(), attendanceRecord)
-                if err != nil {
-                    log.Printf("ERROR: Gagal menyimpan absensi baru untuk tanggal %s: %v", currentDateStr, err)
-                    return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-                        "error": fmt.Sprintf("Gagal menyimpan absensi tanggal %s: %v", currentDateStr, err),
-                    })
-                }
-            } else {
-                // Jika sudah ada, PERBARUI entri yang sudah ada
-                // Pastikan AttendanceUpdatePayload Anda mendukung update Status dan Note
-                updatePayload := models.AttendanceUpdatePayload{
-                    Status:    request.RequestType, // Update status menjadi Sakit/Cuti/Izin
-                    Note:      "Disetujui: " + request.Reason,
-                    // CheckIn/CheckOut tidak diubah agar tidak menimpa jika sudah ada record hadir
-                    // Atau Anda bisa mengosongkannya jika cuti/sakit dianggap override kehadiran
-                    // Misalnya: CheckIn: "", CheckOut: "", // Jika cuti/sakit selalu mengoverride hadir
-                }
-                _, err := h.attendanceRepo.UpdateAttendance(c.Context(), existingAttendance.ID, &updatePayload) // Asumsi ada method UpdateAttendance yang menerima ID dan payload update
-                if err != nil {
-                    log.Printf("ERROR: Gagal memperbarui absensi existing untuk tanggal %s: %v", currentDateStr, err)
-                    return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-                        "error": fmt.Sprintf("Gagal memperbarui absensi tanggal %s: %v", currentDateStr, err),
-                    })
-                }
-            }
-        }
-    }
+			// Cek apakah sudah ada entri absensi untuk user dan tanggal ini
+			existingAttendance, err := h.attendanceRepo.FindAttendanceByUserAndDate(c.Context(), request.UserID, currentDateStr)
+			if err != nil {
+				log.Printf("ERROR: Gagal mencari absensi existing untuk user %s tanggal %s: %v", request.UserID.Hex(), currentDateStr, err)
+				// Lanjutkan ke tanggal berikutnya atau tangani error lebih lanjut
+				continue
+			}
 
-    return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Status pengajuan berhasil diperbarui"})
+			if existingAttendance == nil {
+				// Jika belum ada, buat entri absensi baru
+				attendanceRecord := &models.Attendance{
+					ID:        primitive.NewObjectID(),
+					UserID:    request.UserID,
+					Date:      currentDateStr,
+					CheckIn:   "", // Tidak ada check-in/check-out untuk cuti/sakit
+					CheckOut:  "",
+					Status:    request.RequestType, // Menggunakan RequestType (Sakit/Cuti/Izin)
+					Note:      "Disetujui: " + request.Reason,
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+				}
+				_, err := h.attendanceRepo.CreateAttendance(c.Context(), attendanceRecord)
+				if err != nil {
+					log.Printf("ERROR: Gagal menyimpan absensi baru untuk tanggal %s: %v", currentDateStr, err)
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error": fmt.Sprintf("Gagal menyimpan absensi tanggal %s: %v", currentDateStr, err),
+					})
+				}
+			} else {
+				// Jika sudah ada, PERBARUI entri yang sudah ada
+				// Pastikan AttendanceUpdatePayload Anda mendukung update Status dan Note
+				updatePayload := models.AttendanceUpdatePayload{
+					Status: request.RequestType, // Update status menjadi Sakit/Cuti/Izin
+					Note:   "Disetujui: " + request.Reason,
+					// CheckIn/CheckOut tidak diubah agar tidak menimpa jika sudah ada record hadir
+					// Atau Anda bisa mengosongkannya jika cuti/sakit dianggap override kehadiran
+					// Misalnya: CheckIn: "", CheckOut: "", // Jika cuti/sakit selalu mengoverride hadir
+				}
+				_, err := h.attendanceRepo.UpdateAttendance(c.Context(), existingAttendance.ID, &updatePayload) // Asumsi ada method UpdateAttendance yang menerima ID dan payload update
+				if err != nil {
+					log.Printf("ERROR: Gagal memperbarui absensi existing untuk tanggal %s: %v", currentDateStr, err)
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error": fmt.Sprintf("Gagal memperbarui absensi tanggal %s: %v", currentDateStr, err),
+					})
+				}
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Status pengajuan berhasil diperbarui"})
 }
