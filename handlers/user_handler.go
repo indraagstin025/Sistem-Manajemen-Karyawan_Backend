@@ -59,35 +59,46 @@ func NewUserHandler(
 // @Failure 500 {object} object{error=string} "Internal server error"
 // @Router /users/{id} [get]
 func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
-	idParam := c.Params("id")
-	objID, err := primitive.ObjectIDFromHex(idParam)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
-	}
+    idParam := c.Params("id")
+    objID, err := primitive.ObjectIDFromHex(idParam)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
+    }
 
-	claims, ok := c.Locals("user").(*models.Claims)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
-	}
+    claims, ok := c.Locals("user").(*models.Claims)
+    if !ok {
+        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
+    }
 
-	if claims.Role != "admin" && claims.UserID.Hex() != idParam {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat melihat profile anda sendiri."})
-	}
+    if claims.Role != "admin" && claims.UserID.Hex() != idParam {
+        return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat melihat profile anda sendiri."})
+    }
 
-	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+    defer cancel()
 
-	user, err := h.userRepo.FindUserByID(ctx, objID)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
-		}
-		log.Printf("Error getting user by ID: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
-	}
+    user, err := h.userRepo.FindUserByID(ctx, objID) // Baris ini akan mengembalikan (nil, nil) jika tidak ditemukan
 
-	user.Password = ""
-	return c.Status(fiber.StatusOK).JSON(user)
+    // >>>>> INI KODE YANG WAJIB ANDA TAMBAHKAN/PASTIKAN ADA <<<<<
+    // Periksa apakah user ditemukan (tidak nil) DAN tidak ada error yang menunjukkan 'tidak ditemukan'
+    if user == nil {
+        if err == nil || err == mongo.ErrNoDocuments { // Jika user nil dan error juga nil, atau errornya ErrNoDocuments
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
+        }
+        // Jika user nil tapi ada error lain (selain ErrNoDocuments), ini masalah di repo
+        log.Printf("ERROR: FindUserByID mengembalikan user nil dengan error: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal mendapatkan user (data kosong atau error repo)."})
+    }
+    // >>>>> AKHIR KODE YANG WAJIB ADA <<<<<
+
+
+    if err != nil { // Blok ini akan menangani error lain dari repo (selain ErrNoDocuments)
+        log.Printf("Error getting user by ID: %v", err)
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
+    }
+
+    user.Password = "" // Baris ini sekarang aman karena 'user' dipastikan tidak nil
+    return c.Status(fiber.StatusOK).JSON(user)
 }
 
 // GetAllUsers godoc
