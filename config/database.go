@@ -8,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
@@ -107,4 +108,12 @@ func DisconnectDB() {
 		}
 		log.Println("Disconnect from MongoDB")
 	}
+}
+
+func GetGridFSBucket() (*gridfs.Bucket, error) {
+	if MongoConn == nil {
+		log.Fatal("MongoDB belum terkoneksi. Panggil MongoConnect() terlebih dahulu.")
+	}
+	db := MongoConn.Database(DBName)
+	return gridfs.NewBucket(db)
 }

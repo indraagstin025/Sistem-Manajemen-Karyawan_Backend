@@ -1,16 +1,17 @@
 package handlers
 
 import (
-	"context"
+	
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"Sistem-Manajemen-Karyawan/models"
 	"Sistem-Manajemen-Karyawan/repository"
+	"Sistem-Manajemen-Karyawan/config"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -200,54 +201,57 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 
 	reqID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		log.Println("[UploadAttachment] ID tidak valid:", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID pengajuan tidak valid"})
 	}
 
-	file, err := c.FormFile("attachment")
+	// Ambil file dari form-data
+	fileHeader, err := c.FormFile("attachment")
 	if err != nil {
-		log.Println("[UploadAttachment] ERROR formFile:", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "File tidak ditemukan"})
 	}
 
-	log.Println("[UploadAttachment] File:", file.Filename)
+	file, err := fileHeader.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuka file"})
+	}
+	defer file.Close()
 
-	// Buat folder uploads/attachments jika belum ada
-	uploadDir := "./uploads/attachments"
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		log.Println("[UploadAttachment] ERROR membuat folder:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "Gagal membuat folder penyimpanan"})
+	bucket, err := config.GetGridFSBucket()
+	if err != nil {
+		log.Println("Gagal membuat bucket GridFS:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal inisialisasi penyimpanan file"})
 	}
 
-	// Simpan file
-	uniqueFileName := fmt.Sprintf("%d-%s", time.Now().Unix(), file.Filename)
-	filePath := fmt.Sprintf("%s/%s", uploadDir, uniqueFileName)
-	fileURL := fmt.Sprintf("/uploads/attachments/%s", uniqueFileName)
+	uploadStream, err := bucket.OpenUploadStream(fileHeader.Filename)
+	if err != nil {
+		log.Println("Gagal membuka upload stream GridFS:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal mengunggah file"})
+	}
+	defer uploadStream.Close()
 
-	log.Println("[UploadAttachment] Menyimpan file ke:", filePath)
-
-	if err := c.SaveFile(file, filePath); err != nil {
-		log.Println("[UploadAttachment] ERROR SaveFile:", err)
-		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menyimpan file lampiran: %v", err)})
+	fileSize, err := io.Copy(uploadStream, file)
+	if err != nil {
+		log.Println("Gagal menulis file ke GridFS:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal menyimpan file"})
 	}
 
-	// Simpan URL ke database
-	_, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-	defer cancel()
+	log.Printf("Berhasil upload ke GridFS (%d bytes)\n", fileSize)
 
+	fileID := uploadStream.FileID.(primitive.ObjectID)
+	fileURL := fmt.Sprintf("/api/v1/files/%s", fileID.Hex()) // disimpan di database
+
+	// Simpan fileURL ke database leave request
 	_, err = h.leaveRepo.UpdateAttachmentURL(reqID, fileURL)
 	if err != nil {
-		log.Println("[UploadAttachment] ERROR simpan URL ke DB:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "Gagal menyimpan URL ke database"})
+		log.Println("Gagal menyimpan URL lampiran ke DB:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal menyimpan file ke database"})
 	}
 
-	log.Println("[UploadAttachment] Upload sukses")
 	return c.Status(200).JSON(fiber.Map{
 		"message":  "File berhasil diunggah",
 		"file_url": fileURL,
 	})
 }
-
 
 
 // UpdateLeaveRequestStatus godoc

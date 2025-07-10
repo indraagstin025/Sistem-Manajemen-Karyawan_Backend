@@ -9,6 +9,12 @@ import (
 	"Sistem-Manajemen-Karyawan/config/middleware"
 	"Sistem-Manajemen-Karyawan/handlers"
 	"Sistem-Manajemen-Karyawan/repository"
+
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"Sistem-Manajemen-Karyawan/config"
+	"io"
+
 	_ "Sistem-Manajemen-Karyawan/docs"
 )
 
@@ -38,6 +44,38 @@ func SetupRoutes(app *fiber.App) {
 	})
 	app.Get("/docs/*", swagger.HandlerDefault)
 	app.Static("/uploads", "./uploads")
+
+
+	// Akses file dari GridFS berdasarkan fileID
+app.Get("/api/v1/files/:id", func(c *fiber.Ctx) error {
+	fileIDHex := c.Params("id")
+	fileID, err := primitive.ObjectIDFromHex(fileIDHex)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("ID file tidak valid")
+	}
+
+	bucket, err := config.GetGridFSBucket()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal akses bucket penyimpanan file")
+	}
+
+	downloadStream, err := bucket.OpenDownloadStream(fileID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("File tidak ditemukan")
+	}
+	defer downloadStream.Close()
+
+	c.Set("Content-Type", "application/octet-stream")
+	c.Set("Content-Disposition", "inline; filename=\"file.pdf\"")
+
+	_, err = io.Copy(c, downloadStream)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengirim file")
+	}
+
+	return nil
+})
+
 
 	// API v1 group
 	api := app.Group("/api/v1")
