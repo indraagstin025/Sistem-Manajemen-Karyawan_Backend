@@ -105,7 +105,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	defer cancel()
 
 	user, err := h.userRepo.FindUserByEmail(ctx, payload.Email)
-	if err != nil {
+	if err != nil || user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Kombinasi email dan password salah"})
 	}
 
@@ -114,7 +114,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	pasetoMaker, err := paseto.NewPasetoMaker()
-	if err != nil {
+	if err != nil || pasetoMaker == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menginisialisasi token generator"})
 	}
 
