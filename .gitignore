@@ -7,7 +7,7 @@
 # Dependency
 vendor/
 
-uploads/
+
 
 # Config
 .env
