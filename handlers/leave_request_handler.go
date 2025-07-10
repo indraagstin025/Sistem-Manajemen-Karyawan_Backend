@@ -196,45 +196,39 @@ func (h *LeaveRequestHandler) GetMyLeaveRequests(c *fiber.Ctx) error {
 // @Router /leave-requests/{id}/attachment [post]
 func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 	id := c.Params("id")
-	log.Println("[UploadAttachment] ID dari URL param:", id)
+	log.Println("[UploadAttachment] ID:", id)
 
 	reqID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		log.Printf("[UploadAttachment] ERROR: ID tidak valid: %v", err)
+		log.Println("[UploadAttachment] ID tidak valid:", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID pengajuan tidak valid"})
 	}
 
-	// Ambil file dari form
 	file, err := c.FormFile("attachment")
 	if err != nil {
-		log.Printf("[UploadAttachment] ERROR mengambil file: %v", err)
-		if strings.Contains(err.Error(), "no such file") {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "File tidak ditemukan"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil file"})
+		log.Println("[UploadAttachment] ERROR formFile:", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "File tidak ditemukan"})
 	}
 
-	log.Println("[UploadAttachment] Nama file yang diunggah:", file.Filename)
+	log.Println("[UploadAttachment] File:", file.Filename)
 
-	// Buat folder jika belum ada
+	// Buat folder uploads/attachments jika belum ada
 	uploadDir := "./uploads/attachments"
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		log.Printf("[UploadAttachment] ERROR membuat folder %s: %v", uploadDir, err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuat folder penyimpanan"})
+		log.Println("[UploadAttachment] ERROR membuat folder:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal membuat folder penyimpanan"})
 	}
 
-	// Buat nama file unik dan path tujuan
+	// Simpan file
 	uniqueFileName := fmt.Sprintf("%d-%s", time.Now().Unix(), file.Filename)
 	filePath := fmt.Sprintf("%s/%s", uploadDir, uniqueFileName)
 	fileURL := fmt.Sprintf("/uploads/attachments/%s", uniqueFileName)
 
-	log.Println("[UploadAttachment] Path tujuan file:", filePath)
-	log.Println("[UploadAttachment] URL file yang akan disimpan di DB:", fileURL)
+	log.Println("[UploadAttachment] Menyimpan file ke:", filePath)
 
-	// Simpan file ke disk
 	if err := c.SaveFile(file, filePath); err != nil {
-		log.Printf("[UploadAttachment] ERROR saat menyimpan file ke disk: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file"})
+		log.Println("[UploadAttachment] ERROR SaveFile:", err)
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menyimpan file lampiran: %v", err)})
 	}
 
 	// Simpan URL ke database
@@ -243,17 +237,17 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 
 	_, err = h.leaveRepo.UpdateAttachmentURL(reqID, fileURL)
 	if err != nil {
-		log.Printf("[UploadAttachment] ERROR menyimpan URL ke database untuk request ID %s: %v", reqID.Hex(), err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan URL file ke database"})
+		log.Println("[UploadAttachment] ERROR simpan URL ke DB:", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Gagal menyimpan URL ke database"})
 	}
 
-	log.Println("[UploadAttachment] Berhasil upload dan simpan URL ke database")
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	log.Println("[UploadAttachment] Upload sukses")
+	return c.Status(200).JSON(fiber.Map{
 		"message":  "File berhasil diunggah",
 		"file_url": fileURL,
 	})
 }
+
 
 
 // UpdateLeaveRequestStatus godoc
