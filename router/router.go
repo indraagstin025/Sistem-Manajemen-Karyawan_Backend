@@ -54,6 +54,7 @@ func SetupRoutes(app *fiber.App) {
 	// === TAMBAHKAN INI: Rute baru untuk mengakses file dari GridFS ===
 	// Diberi middleware agar hanya pengguna yang sudah login yang bisa mengakses
 	api.Get("/files/:id", middleware.AuthMiddleware(), fileHandler.GetFileFromGridFS)
+	api.Get("/attachments/:filename", middleware.AuthMiddleware(), fileHandler.GetFileByFilename)
 
 	// Authentication routes
 	authGroup := api.Group("/auth")

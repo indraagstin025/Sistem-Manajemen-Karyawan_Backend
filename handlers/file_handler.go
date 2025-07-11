@@ -67,3 +67,40 @@ func (h *FileHandler) GetFileFromGridFS(c *fiber.Ctx) error {
 	// Kirim buffer yang berisi seluruh file ke browser
 	return c.Send(buf.Bytes())
 }
+
+
+// GetFileByFilename mengambil file dari GridFS berdasarkan nama file
+func (h *FileHandler) GetFileByFilename(c *fiber.Ctx) error {
+	filename := c.Params("filename")
+	if filename == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Nama file tidak boleh kosong"})
+	}
+
+	bucket, err := config.GetGridFSBucket()
+	if err != nil {
+		log.Printf("ERROR: Gagal mendapatkan bucket GridFS: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses penyimpanan file"})
+	}
+
+	// Buka stream download berdasarkan nama file
+	downloadStream, err := bucket.OpenDownloadStreamByName(filename)
+	if err != nil {
+		log.Printf("ERROR: File tidak ditemukan dengan nama %s: %v", filename, err)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "File tidak ditemukan"})
+	}
+	defer downloadStream.Close()
+
+	// Baca seluruh file ke buffer
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, downloadStream); err != nil {
+		log.Printf("ERROR: Gagal membaca file dari GridFS ke buffer: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca data file"})
+	}
+
+	fileInfo := downloadStream.GetFile()
+	contentType := http.DetectContentType(buf.Bytes())
+	c.Set("Content-Type", contentType)
+	c.Set("Content-Disposition", "inline; filename=\""+fileInfo.Name+"\"")
+
+	return c.Send(buf.Bytes())
+}
