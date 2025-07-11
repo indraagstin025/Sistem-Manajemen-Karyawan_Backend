@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/swagger"
 
 	"Sistem-Manajemen-Karyawan/config/middleware"
-	"Sistem-Manajemen-Karyawan/handlers"
+	"Sistem-Manajemen-Karyawan/handlers"	
 	"Sistem-Manajemen-Karyawan/repository"
 
 	_ "Sistem-Manajemen-Karyawan/docs"
@@ -67,6 +67,7 @@ func SetupRoutes(app *fiber.App) {
 	protectedUserGroup.Get("/:id", userHandler.GetUserByID)
 	protectedUserGroup.Put("/:id", userHandler.UpdateUser)
 	protectedUserGroup.Post("/:id/upload-photo", userHandler.UploadProfilePhoto)
+	protectedUserGroup.Get("/:id/photo", userHandler.GetProfilePhoto)
 
 	// Admin routes
 	adminGroup := api.Group("/admin", middleware.AuthMiddleware(), middleware.AdminMiddleware())

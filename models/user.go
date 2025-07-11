@@ -16,11 +16,14 @@ type User struct {
 	Department   string             `json:"department" bson:"department,omitempty"`
 	BaseSalary   float64            `json:"base_salary" bson:"base_salary,omitempty"`
 	Address      string             `json:"address" bson:"address,omitempty"`
-	Photo        string             `json:"photo" bson:"photo,omitempty"`
+	Photo        string             `json:"photo" bson:"photo,omitempty"` // bisa dihapus kalau tidak digunakan lagi
+	PhotoID      primitive.ObjectID `json:"photo_id,omitempty" bson:"photo_id,omitempty"`
+	PhotoMime    string             `json:"photo_mime,omitempty" bson:"photo_mime,omitempty"`
 	IsFirstLogin bool               `json:"is_first_login" bson:"isFirstLogin,omitempty"`
 	CreatedAt    time.Time          `json:"created_at" bson:"created_at,omitempty"`
 	UpdatedAt    time.Time          `json:"updated_at" bson:"updated_at,omitempty"`
 }
+
 
 type UserRegisterPayload struct {
 	Name       string  `json:"name" validate:"required,min=3,max=100"`

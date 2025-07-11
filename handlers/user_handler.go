@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo" // Pastikan ini diimpor untuk mongo.Pipeline dan mongo.Cursor
 
+	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
 	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
@@ -432,12 +433,7 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 
 	file, err := c.FormFile("photo")
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file") {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tidak ada file foto yang diunggah."})
-		}
-
-		log.Printf("Error mengambil file: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil file."})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tidak ada file foto yang diunggah."})
 	}
 
 	allowedTypes := map[string]bool{
@@ -446,7 +442,8 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 		"image/gif":  true,
 		"image/webp": true,
 	}
-	if !allowedTypes[file.Header.Get("Content-Type")] {
+	contentType := file.Header.Get("Content-Type")
+	if !allowedTypes[contentType] {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung. Hanya JPG, PNG, GIF, WEBP yang diizinkan."})
 	}
 
@@ -455,32 +452,104 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Ukuran file terlalu besar. Maksimal %d MB.", maxFileSize/1024/1024)})
 	}
 
-	uploadDir := "./uploads"
-	fileName := fmt.Sprintf("%s_%d%s", userID, time.Now().Unix(), filepath.Ext(file.Filename))
-	filePath := filepath.Join(uploadDir, fileName)
+	// Buka file
+	fileReader, err := file.Open()
+	if err != nil {
+		log.Printf("Gagal membuka file: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuka file."})
+	}
+	defer fileReader.Close()
 
-	if err := c.SaveFile(file, filePath); err != nil {
-		log.Printf("Error menyimpan file: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file foto."})
+	// Ambil bucket GridFS dari config
+	bucket, err := config.GetGridFSBucket()
+	if err != nil {
+		log.Printf("Gagal membuat GridFS bucket: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses GridFS bucket."})
 	}
 
-	photoURL := fmt.Sprintf("https://sistem-manajemen-karyawanbackend-production.up.railway.app/uploads/%s", fileName)
+	// Upload file ke GridFS
+	uploadStream, err := bucket.OpenUploadStream(file.Filename)
+	if err != nil {
+		log.Printf("Gagal membuka stream GridFS: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file ke GridFS."})
+	}
+	defer uploadStream.Close()
 
-	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	_, err = io.Copy(uploadStream, fileReader)
+	if err != nil {
+		log.Printf("Gagal menulis ke stream GridFS: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file ke GridFS."})
+	}
+
+	photoID := uploadStream.FileID.(primitive.ObjectID)
+
+	// Simpan ke user
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
 	defer cancel()
 
-	updateData := bson.M{"photo": photoURL}
+	updateData := bson.M{
+		"photo_id":   photoID,
+		"photo_mime": contentType,
+	}
+
 	result, err := h.userRepo.UpdateUser(ctx, objID, updateData)
 	if err != nil {
-		log.Printf("Error mengupdate URL foto di database: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui URL foto di database."})
+		log.Printf("Error mengupdate data user: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui user."})
 	}
 	if result.ModifiedCount == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User tidak ditemukan atau foto tidak berubah."})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User tidak ditemukan atau data tidak berubah."})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message":   "Foto profil berhasil diunggah.",
-		"photo_url": photoURL,
+		"photo_id":  photoID.Hex(),
+		"mime_type": contentType,
 	})
 }
+
+func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID user tidak valid"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
+	defer cancel()
+
+	// Ambil user dari database
+	user, err := h.userRepo.FindUserByID(ctx, objID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil data user"})
+	}
+	if user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User tidak ditemukan"})
+	}
+
+	// Cek apakah user punya PhotoID
+	if user.PhotoID.IsZero() {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Foto profil tidak tersedia"})
+	}
+
+	bucket, err := config.GetGridFSBucket()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses GridFS"})
+	}
+
+	var buf bytes.Buffer
+	_, err = bucket.DownloadToStream(user.PhotoID, &buf)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca foto dari GridFS"})
+	}
+
+	// Set MIME type yang disimpan (default ke JPEG jika kosong)
+	contentType := "image/jpeg"
+	if user.PhotoMime != "" {
+		contentType = user.PhotoMime
+	}
+	c.Set("Content-Type", contentType)
+
+	return c.Send(buf.Bytes())
+}
+
