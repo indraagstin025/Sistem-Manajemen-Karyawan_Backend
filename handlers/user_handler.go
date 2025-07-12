@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -527,10 +528,16 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User tidak ditemukan"})
 	}
 
-	// Cek apakah user punya PhotoID
-	if user.PhotoID.IsZero() {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Foto profil tidak tersedia"})
-	}
+if user.PhotoID.IsZero() {
+    // Kirim gambar default langsung dari backend
+    defaultImageBytes, err := os.ReadFile("assets/default-profile.jpg")
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memuat foto default"})
+    }
+    c.Set("Content-Type", "image/jpeg")
+    return c.Send(defaultImageBytes)
+}
+
 
 	bucket, err := config.GetGridFSBucket()
 	if err != nil {
