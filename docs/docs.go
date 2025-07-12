@@ -2082,6 +2082,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "photo": {
+                    "description": "bisa dihapus kalau tidak digunakan lagi",
+                    "type": "string"
+                },
+                "photo_id": {
+                    "type": "string"
+                },
+                "photo_mime": {
                     "type": "string"
                 },
                 "position": {
