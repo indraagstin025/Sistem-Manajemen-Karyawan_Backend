@@ -11,6 +11,7 @@ import (
 	"Sistem-Manajemen-Karyawan/router"
 	// HAPUS: "Sistem-Manajemen-Karyawan/handlers" // Tidak perlu import handlers di sini
 	_ "Sistem-Manajemen-Karyawan/docs" // Import docs untuk swagger
+	_ "time/tzdata" // ✨ TAMBAHKAN BARIS INI! ✨
 )
 
 // @title Sistem Manajemen Karyawan API
