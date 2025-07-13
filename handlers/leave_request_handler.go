@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	
 	"fmt"
 	"io"
 	"log"
@@ -9,12 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
 	"Sistem-Manajemen-Karyawan/repository"
-	"Sistem-Manajemen-Karyawan/config"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type LeaveRequestHandler struct {
@@ -292,80 +292,122 @@ func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
+	// Ambil data pengajuan cuti sebelum update statusnya
+	// Ini penting untuk mendapatkan UserID dan range tanggal
+	originalRequest, err := h.leaveRepo.FindByID(reqID)
+	if err != nil {
+		// Periksa jika errornya karena dokumen tidak ditemukan
+		if err == mongo.ErrNoDocuments || err.Error() == "gagal menemukan pengajuan berdasarkan ID" {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal mencari pengajuan cuti: %v", err)})
+	}
+	if originalRequest == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan"})
+	}
+
+	// Lakukan update status pengajuan cuti di database
 	updateResult, err := h.leaveRepo.UpdateStatus(reqID, payload.Status, payload.Note)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui status"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memperbarui status pengajuan cuti"})
 	}
 
 	if updateResult.MatchedCount == 0 {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan dengan ID ini tidak ditemukan"})
 	}
 
-	if payload.Status == "approved" {
-		request, err := h.leaveRepo.FindByID(reqID)
-		if err != nil {
-			// Periksa jika errornya karena dokumen tidak ditemukan
-			if err.Error() == "departemen tidak ditemukan" || err.Error() == "gagal menemukan pengajuan berdasarkan ID" { // Sesuaikan pesan error dari FindByID Anda
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah update status."})
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal menemukan data pengajuan setelah diupdate: %v", err)})
+	// --- Logika Penanganan Absensi Berdasarkan Status Pengajuan Cuti ---
+
+	// Konversi tanggal mulai dan berakhir dari string ke time.Time
+	startDate, parseErr := time.Parse("2006-01-02", originalRequest.StartDate)
+	if parseErr != nil {
+		log.Printf("ERROR: Gagal parse start_date %s: %v", originalRequest.StartDate, parseErr)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Format tanggal mulai tidak valid."})
+	}
+	endDate, parseErr := time.Parse("2006-01-02", originalRequest.EndDate)
+	if parseErr != nil {
+		log.Printf("ERROR: Gagal parse end_date %s: %v", originalRequest.EndDate, parseErr)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Format tanggal berakhir tidak valid."})
+	}
+
+	// Iterasi setiap hari dalam rentang pengajuan cuti
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		currentDateStr := d.Format("2006-01-02")
+
+		// Cek apakah sudah ada entri absensi untuk user dan tanggal ini
+		existingAttendance, err := h.attendanceRepo.FindAttendanceByUserAndDate(c.Context(), originalRequest.UserID, currentDateStr)
+		if err != nil && err != mongo.ErrNoDocuments {
+			log.Printf("ERROR: Gagal mencari absensi untuk user %s tanggal %s: %v", originalRequest.UserID.Hex(), currentDateStr, err)
+			// Lanjutkan ke tanggal berikutnya, atau tangani error lebih parah jika ini fatal
+			continue
 		}
-		if request == nil { // Tambahkan cek nil jika FindByID mengembalikan nil untuk tidak ditemukan
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Pengajuan tidak ditemukan setelah diupdate."})
-		}
 
-		startDate, _ := time.Parse("2006-01-02", request.StartDate)
-		endDate, _ := time.Parse("2006-01-02", request.EndDate)
-
-		// Logika untuk mencatat/memperbarui absensi di koleksi attendances
-		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
-			currentDateStr := d.Format("2006-01-02")
-
-			// Cek apakah sudah ada entri absensi untuk user dan tanggal ini
-			existingAttendance, err := h.attendanceRepo.FindAttendanceByUserAndDate(c.Context(), request.UserID, currentDateStr)
-			if err != nil {
-				log.Printf("ERROR: Gagal mencari absensi existing untuk user %s tanggal %s: %v", request.UserID.Hex(), currentDateStr, err)
-				// Lanjutkan ke tanggal berikutnya atau tangani error lebih lanjut
-				continue
-			}
-
+		if payload.Status == "approved" {
+			// LOGIKA SAAT PENGAJUAN DISETUJUI (mirip dengan yang sudah ada)
 			if existingAttendance == nil {
-				// Jika belum ada, buat entri absensi baru
+				// Buat entri absensi baru jika belum ada
 				attendanceRecord := &models.Attendance{
 					ID:        primitive.NewObjectID(),
-					UserID:    request.UserID,
+					UserID:    originalRequest.UserID,
 					Date:      currentDateStr,
 					CheckIn:   "", // Tidak ada check-in/check-out untuk cuti/sakit
 					CheckOut:  "",
-					Status:    request.RequestType, // Menggunakan RequestType (Sakit/Cuti/Izin)
-					Note:      "Disetujui: " + request.Reason,
+					Status:    originalRequest.RequestType, // Menggunakan RequestType (Sakit/Cuti/Izin)
+					Note:      fmt.Sprintf("Disetujui: %s. Catatan admin: %s", originalRequest.Reason, payload.Note),
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
 				}
-				_, err := h.attendanceRepo.CreateAttendance(c.Context(), attendanceRecord)
-				if err != nil {
-					log.Printf("ERROR: Gagal menyimpan absensi baru untuk tanggal %s: %v", currentDateStr, err)
-					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-						"error": fmt.Sprintf("Gagal menyimpan absensi tanggal %s: %v", currentDateStr, err),
-					})
+				_, createErr := h.attendanceRepo.CreateAttendance(c.Context(), attendanceRecord)
+				if createErr != nil {
+					log.Printf("ERROR: Gagal menyimpan absensi baru untuk tanggal %s (approved): %v", currentDateStr, createErr)
+					// Lanjutkan, jangan hentikan proses approval total
 				}
 			} else {
-				// Jika sudah ada, PERBARUI entri yang sudah ada
-				// Pastikan AttendanceUpdatePayload Anda mendukung update Status dan Note
+				// Perbarui entri absensi yang sudah ada
+				// Jika statusnya bukan Hadir/Telat (misal: "Belum Absen", "Alpha", atau status cuti sebelumnya)
+				// Kita akan update statusnya. Jika sudah Hadir/Telat, kita bisa memilih untuk override atau tidak.
+				// Dalam kasus ini, kita asumsikan cuti/izin mengoverride kehadiran normal.
 				updatePayload := models.AttendanceUpdatePayload{
-					Status: request.RequestType, // Update status menjadi Sakit/Cuti/Izin
-					Note:   "Disetujui: " + request.Reason,
-					// CheckIn/CheckOut tidak diubah agar tidak menimpa jika sudah ada record hadir
-					// Atau Anda bisa mengosongkannya jika cuti/sakit dianggap override kehadiran
-					// Misalnya: CheckIn: "", CheckOut: "", // Jika cuti/sakit selalu mengoverride hadir
+					Status:    originalRequest.RequestType, // Update status menjadi Sakit/Cuti/Izin
+					Note:      fmt.Sprintf("Disetujui: %s. Catatan admin: %s", originalRequest.Reason, payload.Note),
+					CheckIn:   "", // Kosongkan check_in/out jika ini adalah override status cuti/izin
+					CheckOut:  "",
 				}
-				_, err := h.attendanceRepo.UpdateAttendance(c.Context(), existingAttendance.ID, &updatePayload) // Asumsi ada method UpdateAttendance yang menerima ID dan payload update
-				if err != nil {
-					log.Printf("ERROR: Gagal memperbarui absensi existing untuk tanggal %s: %v", currentDateStr, err)
-					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-						"error": fmt.Sprintf("Gagal memperbarui absensi tanggal %s: %v", currentDateStr, err),
-					})
+				_, updateErr := h.attendanceRepo.UpdateAttendance(c.Context(), existingAttendance.ID, &updatePayload)
+				if updateErr != nil {
+					log.Printf("ERROR: Gagal memperbarui absensi existing untuk tanggal %s (approved): %v", currentDateStr, updateErr)
+					// Lanjutkan, jangan hentikan proses approval total
 				}
+			}
+		} else if payload.Status == "rejected" {
+			// LOGIKA SAAT PENGAJUAN DITOLAK
+			if existingAttendance != nil {
+				// Jika absensi ditemukan untuk tanggal ini, dan statusnya terkait dengan cuti/izin
+				// (yang artinya dibuat karena pengajuan ini), ubah kembali menjadi "Tidak Absen" / "Alpha"
+				// atau hapus jika absensi hanya ada karena pengajuan ini.
+				
+				// Cek apakah absensi yang ada dibuat sebagai 'Sakit', 'Cuti', atau 'Izin'
+				// Ini untuk menghindari menimpa status 'Hadir' atau 'Telat' yang mungkin valid
+				if existingAttendance.Status == "Sakit" || existingAttendance.Status == "Cuti" || existingAttendance.Status == "Izin" {
+					// Jika statusnya adalah salah satu dari jenis cuti/izin
+					// Dan jika belum ada check_in/check_out yang valid
+					if existingAttendance.CheckIn == "" && existingAttendance.CheckOut == "" {
+						updatePayload := models.AttendanceUpdatePayload{
+							Status:    "Tidak Absen", // Ubah status menjadi 'Tidak Absen'
+							Note:      fmt.Sprintf("Pengajuan ditolak: %s. Catatan admin: %s", originalRequest.Reason, payload.Note),
+							CheckIn:   "",            // Pastikan kosong
+							CheckOut:  "",            // Pastikan kosong
+						}
+						_, updateErr := h.attendanceRepo.UpdateAttendance(c.Context(), existingAttendance.ID, &updatePayload)
+						if updateErr != nil {
+							log.Printf("ERROR: Gagal memperbarui absensi existing untuk tanggal %s (rejected): %v", currentDateStr, updateErr)
+						}
+					}
+					// Jika sudah ada check_in/check_out (misalnya user tetap masuk dan absen hadir/telat)
+					// Biarkan record absensi tetap seperti adanya (Hadir/Telat). Jangan override.
+				}
+				// Jika status existingAttendance adalah Hadir/Telat, biarkan saja.
+				// Karyawan harus tetap dianggap hadir jika dia memang absen hadir/telat meskipun cutinya ditolak.
 			}
 		}
 	}
