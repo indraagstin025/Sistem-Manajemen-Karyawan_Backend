@@ -3,6 +3,7 @@ package handlers
 import (
 	"context" // Pastikan ini diimpor
 	"encoding/base64"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -84,23 +85,40 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	// 5. Cek apakah user sudah melakukan check-in hari ini
 	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
 	if err == nil && attendance != nil {
-		// Jika ditemukan record absensi untuk hari ini, artinya user sudah check-in.
-		// Kembalikan error 409 Conflict.
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 			"error": "Anda sudah melakukan check-in hari ini.",
 		})
 	}
 
 	// 6. Proses CHECK-IN: Buat record absensi baru
+	// --- PERBAIKAN FORMAT WAKTU DIMULAI DI SINI ---
+	// Muat zona waktu WIB (Jakarta/Asia/Jakarta)
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		// Log error atau tangani sesuai kebijakan aplikasi Anda
+		fmt.Printf("Error loading location: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal mendapatkan zona waktu yang tepat.",
+		})
+	}
+
+	currentTimeInWIB := time.Now().In(loc) // Dapatkan waktu saat ini di zona waktu WIB
+
+	// Format waktu ke HH:MM AM/PM
+	// Layout "03:04 PM" akan memberikan format 12 jam dengan AM/PM (misal: 08:44 PM)
+	checkInTimeFormatted := currentTimeInWIB.Format("03:04 PM")
+	// --- PERBAIKAN FORMAT WAKTU BERAKHIR DI SINI ---
+
+
 	newAttendance := models.Attendance{
 		ID:        primitive.NewObjectID(),
 		UserID:    userID,
 		Date:      today,
-		CheckIn:   time.Now().Format("15:04"), // Catat waktu check-in
+		CheckIn:   checkInTimeFormatted, // Gunakan waktu yang sudah diformat
 		CheckOut:  "",                        // CheckOut dibiarkan kosong
 		Status:    "Hadir",                   // Status default
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: time.Now(), // Tetap gunakan waktu UTC untuk penyimpanan jika Anda mau, atau disesuaikan dengan WIB
+		UpdatedAt: time.Now(), // Tetap gunakan waktu UTC untuk penyimpanan jika Anda mau, atau disesuaikan dengan WIB
 	}
 
 	_, err = h.repo.CreateAttendance(c.Context(), &newAttendance)
