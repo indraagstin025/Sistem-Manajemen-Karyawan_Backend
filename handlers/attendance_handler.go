@@ -45,6 +45,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		})
 	}
 
+	// 1. Validasi QR Code yang dipindai
 	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -57,13 +58,14 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validasi kadaluarsa dan tanggal QR
+	// 2. Validasi kadaluarsa QR Code
 	if time.Now().After(qrCode.ExpiresAt) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "QR Code sudah kadaluarsa.",
 		})
 	}
 
+	// 3. Validasi tanggal QR Code (harus berlaku untuk hari ini)
 	today := time.Now().Format("2006-01-02")
 	if qrCode.Date != today {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -71,7 +73,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validasi ID user
+	// 4. Validasi ID user dari payload
 	userID, err := primitive.ObjectIDFromHex(payload.UserID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -79,37 +81,24 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-	// Cek apakah user sudah absen hari ini
+	// 5. Cek apakah user sudah melakukan check-in hari ini
 	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
 	if err == nil && attendance != nil {
-		if attendance.CheckOut == "" {
-			// ✅ Proses CHECK-OUT
-			currentTime := time.Now().Format("15:04")
-			_, err := h.repo.UpdateAttendanceCheckout(c.Context(), attendance.ID, currentTime)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Gagal melakukan check-out: " + err.Error(),
-				})
-			}
-			return c.Status(fiber.StatusOK).JSON(fiber.Map{
-				"message": "Berhasil check-out pukul " + currentTime,
-			})
-		} else {
-			// ❌ Sudah check-in dan check-out
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "Anda sudah melakukan check-in dan check-out hari ini.",
-			})
-		}
+		// Jika ditemukan record absensi untuk hari ini, artinya user sudah check-in.
+		// Kembalikan error 409 Conflict.
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Anda sudah melakukan check-in hari ini.",
+		})
 	}
 
-	// ✅ Proses CHECK-IN (belum ada absensi hari ini)
+	// 6. Proses CHECK-IN: Buat record absensi baru
 	newAttendance := models.Attendance{
 		ID:        primitive.NewObjectID(),
 		UserID:    userID,
 		Date:      today,
-		CheckIn:   time.Now().Format("15:04"),
-		CheckOut:  "",
-		Status:    "Hadir", // default hadir
+		CheckIn:   time.Now().Format("15:04"), // Catat waktu check-in
+		CheckOut:  "",                        // CheckOut dibiarkan kosong
+		Status:    "Hadir",                   // Status default
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -121,6 +110,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		})
 	}
 
+	// 7. Berikan respons sukses check-in
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Berhasil check-in pukul " + newAttendance.CheckIn,
 	})
