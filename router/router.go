@@ -80,6 +80,8 @@ func SetupRoutes(app *fiber.App) {
 	attendanceGroup := api.Group("/attendance", middleware.AuthMiddleware())
 	attendanceGroup.Post("/scan", attendanceHandler.ScanQRCode)
 	attendanceGroup.Get("/my-history", attendanceHandler.GetMyAttendanceHistory)
+	// Tambahkan ini di grup rute attendance
+	attendanceGroup.Get("/my-today", attendanceHandler.GetMyTodayAttendance)
 	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware())
 	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
 	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance)
