@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 
-	"Sistem-Manajemen-Karyawan/config/middleware" // Pastikan ini path yang benar
+	"Sistem-Manajemen-Karyawan/config/middleware"
 	"Sistem-Manajemen-Karyawan/handlers"
 	"Sistem-Manajemen-Karyawan/repository"
 
-	_ "Sistem-Manajemen-Karyawan/docs" // Untuk dokumentasi Swagger
+	_ "Sistem-Manajemen-Karyawan/docs"
 )
 
 func SetupRoutes(app *fiber.App) {
@@ -21,7 +21,7 @@ func SetupRoutes(app *fiber.App) {
 	deptRepo := repository.NewDepartmentRepository()
 	attendanceRepo := repository.NewAttendanceRepository()
 	leaveRepo := repository.NewLeaveRequestRepository()
-	workScheduleRepo := repository.NewWorkScheduleRepository() // Menggunakan nama variabel yang lebih ringkas
+	workScheduleRepo := repository.NewWorkScheduleRepository()
 
 	// Inisialisasi Handlers
 	authHandler := handlers.NewAuthHandler(userRepo)
@@ -30,9 +30,9 @@ func SetupRoutes(app *fiber.App) {
 	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo)
 	leaveHandler := handlers.NewLeaveRequestHandler(leaveRepo, attendanceRepo)
 	fileHandler := handlers.NewFileHandler()
-	workScheduleHandler := handlers.NewWorkScheduleHandler(workScheduleRepo)// Inisialisasi handler jadwal kerja
+	workScheduleHandler := handlers.NewWorkScheduleHandler(workScheduleRepo)
 
-	// Health check & Docs
+	// Rute Health check & Dokumentasi
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"message": "Sistem Manajemen Karyawan API",
@@ -43,20 +43,19 @@ func SetupRoutes(app *fiber.App) {
 	app.Get("/docs/*", swagger.HandlerDefault)
 	app.Static("/uploads", "./uploads")
 
-	// API v1 group
+	// Grup API v1
 	api := app.Group("/api/v1")
 
-	// === Rute untuk mengakses file dari GridFS ===
-	// Diberi middleware agar hanya pengguna yang sudah login yang bisa mengakses
+	// Rute untuk mengakses file (membutuhkan login)
 	api.Get("/files/:id", middleware.AuthMiddleware(), fileHandler.GetFileFromGridFS)
 	api.Get("/attachments/:filename", middleware.AuthMiddleware(), fileHandler.GetFileByFilename)
 
-	// Authentication routes
+	// Rute Autentikasi
 	authGroup := api.Group("/auth")
 	authGroup.Post("/register", authHandler.Register)
 	authGroup.Post("/login", authHandler.Login)
 
-	// User routes
+	// Rute Pengguna (dilindungi otentikasi)
 	protectedUserGroup := api.Group("/users", middleware.AuthMiddleware())
 	protectedUserGroup.Post("/change-password", authHandler.ChangePassword)
 	protectedUserGroup.Get("/:id", userHandler.GetUserByID)
@@ -64,22 +63,20 @@ func SetupRoutes(app *fiber.App) {
 	protectedUserGroup.Post("/:id/upload-photo", userHandler.UploadProfilePhoto)
 	protectedUserGroup.Get("/:id/photo", userHandler.GetProfilePhoto)
 
-	// Admin routes
+	// Rute Admin (dilindungi otentikasi & middleware admin)
 	adminGroup := api.Group("/admin", middleware.AuthMiddleware(), middleware.AdminMiddleware())
 	adminGroup.Get("/users", userHandler.GetAllUsers)
 	adminGroup.Delete("/users/:id", userHandler.DeleteUser)
 	adminGroup.Get("/dashboard-stats", userHandler.GetDashboardStats)
 
-	// Department routes
+	// Rute Departemen
 	api.Get("/departments", middleware.AuthMiddleware(), deptHandler.GetAllDepartments)
 	api.Get("/departments/:id", middleware.AuthMiddleware(), deptHandler.GetDepartmentByID)
 	adminGroup.Post("/departments", deptHandler.CreateDepartment)
 	adminGroup.Put("/departments/:id", deptHandler.UpdateDepartment)
 	adminGroup.Delete("/departments/:id", deptHandler.DeleteDepartment)
 
-	// ======================================================
-	// Rute Kehadiran Karyawan
-	// ======================================================
+	// Rute Kehadiran
 	attendanceGroup := api.Group("/attendance", middleware.AuthMiddleware())
 	attendanceGroup.Post("/scan", attendanceHandler.ScanQRCode)
 	attendanceGroup.Get("/my-history", attendanceHandler.GetMyAttendanceHistory)
@@ -87,9 +84,7 @@ func SetupRoutes(app *fiber.App) {
 	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
 	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance)
 
-	// ======================================================
-	// Rute untuk Pengajuan Izin, Cuti, dan Sakit
-	// ======================================================
+	// Rute Pengajuan Cuti & Izin
 	leaveGroup := api.Group("/leave-requests", middleware.AuthMiddleware())
 	leaveGroup.Post("/", leaveHandler.CreateLeaveRequest)
 	leaveGroup.Post("/:id/attachment", leaveHandler.UploadAttachment)
@@ -99,25 +94,21 @@ func SetupRoutes(app *fiber.App) {
 	adminLeaveGroup.Put("/:id/status", leaveHandler.UpdateLeaveRequestStatus)
 
 	// ======================================================
-	// ✨ Rute untuk Jadwal Kerja (Work Schedules) ✨
+	// Rute Jadwal Kerja (Work Schedules) - Diperbarui
 	// ======================================================
-	workScheduleGroup := api.Group("/work-schedules")
+	workScheduleGroup := api.Group("/work-schedules", middleware.AuthMiddleware())
 
-	// Rute Admin untuk Jadwal Kerja
-	adminWorkScheduleGroup := workScheduleGroup.Group("/", middleware.AuthMiddleware(), middleware.AdminMiddleware())
-	adminWorkScheduleGroup.Post("/", workScheduleHandler.CreateWorkSchedule)
-	adminWorkScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
-	adminWorkScheduleGroup.Put("/:id", workScheduleHandler.UpdateWorkSchedule)
-	adminWorkScheduleGroup.Delete("/:id", workScheduleHandler.DeleteWorkSchedule)
+	// Rute untuk SEMUA PENGGUNA (Admin & Karyawan) untuk MELIHAT jadwal
+	// Endpoint ini sekarang cerdas dan otomatis memfilter hari libur
+	workScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
 
-	// Rute Karyawan untuk Jadwal Kerja
-	workScheduleGroup.Get("/my", middleware.AuthMiddleware(), workScheduleHandler.GetMyWorkSchedules)
-
-	// Rute Karyawan untuk Jadwal Kerja
-	// Karyawan hanya bisa melihat jadwal kerjanya sendiri
+	// Rute KHUSUS ADMIN untuk MENGELOLA (Create, Update, Delete) aturan jadwal
+	workScheduleGroup.Post("/", middleware.AdminMiddleware(), workScheduleHandler.CreateWorkSchedule)
+	workScheduleGroup.Put("/:id", middleware.AdminMiddleware(), workScheduleHandler.UpdateWorkSchedule)
+	workScheduleGroup.Delete("/:id", middleware.AdminMiddleware(), workScheduleHandler.DeleteWorkSchedule)
 	
-
 	log.Println("Semua rute aplikasi berhasil didaftarkan.")
+
 	log.Println("Routes yang tersedia:")
 	log.Println("- POST /api/v1/auth/register")
 	log.Println("- POST /api/v1/auth/login")
@@ -145,7 +136,6 @@ func SetupRoutes(app *fiber.App) {
 	log.Println("- POST /api/v1/work-schedules (admin only)")        // Jadwal Kerja (Admin)
 	log.Println("- GET /api/v1/work-schedules (admin only)")         // Jadwal Kerja (Admin)
 	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")    // Jadwal Kerja (Admin)
-	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)") // Jadwal Kerja (Admin)
-	log.Println("- GET /api/v1/work-schedules/my (protected)")      // Jadwal Kerja (Karyawan)
+	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)") // Jadwal Kerja (Admin)    // Jadwal Kerja (Karyawan)
 	log.Println("Swagger documentation tersedia di: /docs/index.html")
 }

@@ -6,28 +6,28 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// WorkSchedule sekarang menjadi jadwal umum, tidak terikat pada satu user.
+// WorkSchedule sekarang menjadi jadwal umum, dengan dukungan aturan perulangan.
 type WorkSchedule struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	// UserID    primitive.ObjectID `json:"user_id" bson:"user_id"` // <-- DIHAPUS
-	Date      string             `json:"date" bson:"date"`                   // Format: "2006-01-02"
-	StartTime string             `json:"start_time" bson:"start_time"`       // Format: "15:04"
-	EndTime   string             `json:"end_time" bson:"end_time"`           // Format: "15:04"
-	Note      string             `json:"note,omitempty" bson:"note,omitempty"`   // opsional: catatan (misal shift malam)
-	CreatedAt time.Time          `json:"created_at" bson:"created_at,omitempty"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at,omitempty"`
+	ID             primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Date           string             `json:"date" bson:"date"`                   // Akan menjadi tanggal MULAI jadwal
+	StartTime      string             `json:"start_time" bson:"start_time"`
+	EndTime        string             `json:"end_time" bson:"end_time"`
+	Note           string             `json:"note,omitempty" bson:"note,omitempty"`
+	RecurrenceRule string             `json:"recurrence_rule,omitempty" bson:"recurrence_rule,omitempty"` // <-- TAMBAHKAN INI
+	CreatedAt      time.Time          `json:"created_at" bson:"created_at,omitempty"`
+	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at,omitempty"`
 }
 
-// WorkScheduleCreatePayload tidak lagi memerlukan UserID.
+// WorkScheduleCreatePayload juga perlu menerima RecurrenceRule dari frontend.
 type WorkScheduleCreatePayload struct {
-	// UserID    string `json:"user_id" validate:"required"` // <-- DIHAPUS
-	Date      string `json:"date" validate:"required,datetime=2006-01-02"`
-	StartTime string `json:"start_time" validate:"required,datetime=15:04"`
-	EndTime   string `json:"end_time" validate:"required,datetime=15:04"`
-	Note      string `json:"note"`
+	Date           string `json:"date" validate:"required,datetime=2006-01-02"`
+	StartTime      string `json:"start_time" validate:"required,datetime=15:04"`
+	EndTime        string `json:"end_time" validate:"required,datetime=15:04"`
+	Note           string `json:"note"`
+	RecurrenceRule string `json:"recurrence_rule,omitempty"` // <-- TAMBAHKAN INI
 }
 
-// WorkScheduleUpdatePayload tidak perlu diubah. Strukturnya sudah benar.
+// WorkScheduleUpdatePayload tidak perlu diubah.
 type WorkScheduleUpdatePayload struct {
 	Date      string `json:"date,omitempty" validate:"omitempty,datetime=2006-01-02"`
 	StartTime string `json:"start_time,omitempty" validate:"omitempty,datetime=15:04"`
