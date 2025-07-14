@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"time"
-	"log"
+	
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -47,62 +47,41 @@ func NewAttendanceHandler(repo repository.AttendanceRepository, workScheduleRepo
 // @Router /attendance/scan [post]
 // handlers/attendance_handler.go
 
+// handlers/attendance_handler.go
+
 func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	var payload models.QRCodeScanPayload
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid: " + err.Error()})
 	}
-
-	// 1. Validasi QR Code (contoh)
-	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
-	if err != nil || qrCode == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "QR Code tidak ditemukan atau tidak valid."})
-	}
-	if time.Now().After(qrCode.ExpiresAt) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code sudah kadaluarsa."})
-	}
-
-	// 2. Tentukan tanggal "hari ini" berdasarkan zona waktu WIB
+	
+	// Tentukan tanggal "hari ini" berdasarkan zona waktu WIB
 	wib, _ := time.LoadLocation("Asia/Jakarta")
 	today := time.Now().In(wib).Format("2006-01-02")
 
-    // LOG 1: Mencetak tanggal yang akan digunakan untuk mencari jadwal
-    log.Println("Mencari jadwal untuk tanggal (WIB):", today)
-    
-    if qrCode.Date != today {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code ini tidak berlaku untuk hari ini."})
+	// Validasi QR Code...
+	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
+	if err != nil || qrCode == nil || qrCode.Date != today || time.Now().In(wib).After(qrCode.ExpiresAt) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code tidak valid atau sudah kadaluarsa."})
 	}
-
-	// 3. Validasi User ID dan cek duplikasi absensi (contoh)
-	userID, err := primitive.ObjectIDFromHex(payload.UserID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User ID tidak valid."})
-	}
+	
+	// Validasi User ID dan cek duplikasi...
+	userID, _ := primitive.ObjectIDFromHex(payload.UserID)
 	existingAttendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
 	if err == nil && existingAttendance != nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Anda sudah melakukan check-in hari ini."})
 	}
 	
-	// 4. Ambil jadwal kerja untuk hari ini
+	// Ambil jadwal kerja untuk hari ini
 	schedule, err := h.workScheduleRepo.FindByDate(today)
-
-    // LOG 2: Mencetak hasil pencarian jadwal dari database
-    if err != nil {
-        log.Println("Error saat mencari jadwal di database:", err)
-    }
-    log.Printf("Jumlah jadwal ditemukan untuk tanggal %s: %d\n", today, len(schedule))
-
-	// 5. Cek apakah jadwal ditemukan
 	if err != nil || len(schedule) == 0 {
-		// LOG 3: Konfirmasi bahwa kode masuk ke blok error ini
-        log.Println("Check-in ditolak: Tidak ada jadwal kerja ditemukan.")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Tidak ada jadwal kerja yang aktif untuk hari ini.",
 		})
 	}
 	todaysSchedule := schedule[0]
 
-	// 6. Tentukan status kehadiran (Tepat Waktu atau Terlambat)
+	// Tentukan status Tepat Waktu / Terlambat
 	currentTimeInWIB := time.Now().In(wib)
 	scheduledStartTime, _ := time.ParseInLocation("15:04", todaysSchedule.StartTime, wib)
 	
@@ -113,6 +92,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 
 	gracePeriod := 15 * time.Minute
 	latestCheckInTime := scheduledCheckInTime.Add(gracePeriod)
+	
 	var attendanceStatus string
 	if currentTimeInWIB.After(latestCheckInTime) {
 		attendanceStatus = "Terlambat"
@@ -120,13 +100,12 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		attendanceStatus = "Tepat Waktu"
 	}
 
-	// 7. Proses Check-In
+	// Proses Check-In
 	newAttendance := models.Attendance{
 		ID:        primitive.NewObjectID(),
 		UserID:    userID,
 		Date:      today,
 		CheckIn:   currentTimeInWIB.Format("15:04"),
-		CheckOut:  "",
 		Status:    attendanceStatus,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
