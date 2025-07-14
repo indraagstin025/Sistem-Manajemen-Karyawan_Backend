@@ -142,26 +142,31 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal membuat QR Code"
 // @Router /attendance/generate-qr [get]
 func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
-	const QR_CODE_DURATION = 30 * time.Second // Durasi QR Code aktif (misal: 30 detik)
+	const QR_CODE_DURATION = 30 * time.Second 
 
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-	todayStr := time.Now().Format("2006-01-02")
-	currentTime := time.Now()
+    // --- PERBAIKAN ZONA WAKTU DIMULAI DI SINI ---
+	// Tentukan lokasi WIB untuk konsistensi
+	wib, _ := time.LoadLocation("Asia/Jakarta")
+    // Dapatkan waktu dan tanggal saat ini menurut zona waktu WIB
+	currentTimeInWIB := time.Now().In(wib)
+	todayStr := currentTimeInWIB.Format("2006-01-02")
+    // --- AKHIR PERBAIKAN ZONA WAKTU ---
+
 
 	// Cari QR Code yang masih aktif untuk hari ini
 	existingQRCode, err := h.repo.FindActiveQRCodeByDate(ctx, todayStr)
 
-	// Jika ditemukan QR code yang aktif dan belum kadaluarsa, kembalikan itu
-	if err == nil && existingQRCode != nil && currentTime.Before(existingQRCode.ExpiresAt) {
-		// ... (kode untuk mengembalikan existingQRCode) ...
+	// Gunakan currentTimeInWIB untuk perbandingan
+	if err == nil && existingQRCode != nil && currentTimeInWIB.Before(existingQRCode.ExpiresAt) {
+		// (Kode untuk mengembalikan QR code yang sudah ada tetap sama)
 		png, err := qrcode.Encode(existingQRCode.Code, qrcode.Medium, 256)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal re-encode gambar QR Code yang sudah ada."})
 		}
 		encodedString := base64.StdEncoding.EncodeToString(png)
-
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"message":       "QR Code aktif untuk hari ini sudah ada.",
 			"qr_code_image": "data:image/png;base64," + encodedString,
@@ -170,21 +175,20 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-	// Jika tidak ada QR Code aktif atau sudah kadaluarsa, buat yang baru
+	// Jika tidak ada QR Code aktif, buat yang baru
 	uniqueCode := uuid.New().String()
-	// --- Pastikan expiresAt DITAMBAHKAN dari currentTime ---
-	expiresAt := currentTime.Add(QR_CODE_DURATION) // <-- INI YANG HARUS DIPASTIKAN BENAR
+	// Hitung waktu kadaluarsa dari waktu WIB saat ini
+	expiresAt := currentTimeInWIB.Add(QR_CODE_DURATION) 
 
 	newQRCode := &models.QRCode{
 		ID:        primitive.NewObjectID(),
 		Code:      uniqueCode,
-		Date:      todayStr,
-		ExpiresAt: expiresAt, // <-- Pastikan menggunakan expiresAt yang baru dihitung
-		CreatedAt: currentTime,
-		UpdatedAt: currentTime,
+		Date:      todayStr, // Gunakan tanggal WIB
+		ExpiresAt: expiresAt,
+		CreatedAt: currentTimeInWIB, // Gunakan waktu WIB
+		UpdatedAt: currentTimeInWIB, // Gunakan waktu WIB
 	}
 
-	// ... (kode penyimpanan dan pengembalian respons) ...
 	_, err = h.repo.CreateQRCode(ctx, newQRCode)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan data QR Code baru: " + err.Error()})
