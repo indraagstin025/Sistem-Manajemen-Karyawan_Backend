@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"time"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -52,49 +53,66 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid: " + err.Error()})
 	}
 
-	// 1-4. Validasi QR Code dan User (kode Anda yang sudah ada tetap di sini)
-	// ... (kode validasi QR code dan User ID) ...
-    userID, _ := primitive.ObjectIDFromHex(payload.UserID) // Asumsi sudah valid
-	today := time.Now().Format("2006-01-02")
+	// 1. Validasi QR Code (contoh)
+	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
+	if err != nil || qrCode == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "QR Code tidak ditemukan atau tidak valid."})
+	}
+	if time.Now().After(qrCode.ExpiresAt) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code sudah kadaluarsa."})
+	}
+
+	// 2. Tentukan tanggal "hari ini" berdasarkan zona waktu WIB
+	wib, _ := time.LoadLocation("Asia/Jakarta")
+	today := time.Now().In(wib).Format("2006-01-02")
+
+    // LOG 1: Mencetak tanggal yang akan digunakan untuk mencari jadwal
+    log.Println("Mencari jadwal untuk tanggal (WIB):", today)
     
-	// 5. Cek duplikasi check-in (kode Anda yang sudah ada)
-	// ...
+    if qrCode.Date != today {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code ini tidak berlaku untuk hari ini."})
+	}
 
-	// ==================================================================
-	// ✨ LANGKAH BARU: LOGIKA PENYESUAIAN DENGAN JADWAL KERJA ✨
-	// ==================================================================
-
-	// 6. Ambil jadwal kerja untuk hari ini.
-	// Karena jadwal sekarang umum, kita hanya perlu mencari berdasarkan tanggal.
+	// 3. Validasi User ID dan cek duplikasi absensi (contoh)
+	userID, err := primitive.ObjectIDFromHex(payload.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User ID tidak valid."})
+	}
+	existingAttendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
+	if err == nil && existingAttendance != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Anda sudah melakukan check-in hari ini."})
+	}
+	
+	// 4. Ambil jadwal kerja untuk hari ini
 	schedule, err := h.workScheduleRepo.FindByDate(today)
+
+    // LOG 2: Mencetak hasil pencarian jadwal dari database
+    if err != nil {
+        log.Println("Error saat mencari jadwal di database:", err)
+    }
+    log.Printf("Jumlah jadwal ditemukan untuk tanggal %s: %d\n", today, len(schedule))
+
+	// 5. Cek apakah jadwal ditemukan
 	if err != nil || len(schedule) == 0 {
-		// Jika tidak ada jadwal kerja hari ini (misalnya hari libur atau Minggu), tolak check-in.
+		// LOG 3: Konfirmasi bahwa kode masuk ke blok error ini
+        log.Println("Check-in ditolak: Tidak ada jadwal kerja ditemukan.")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Tidak ada jadwal kerja yang aktif untuk hari ini.",
 		})
 	}
-	// Kita ambil jadwal pertama yang ditemukan untuk hari itu
 	todaysSchedule := schedule[0]
 
-	// 7. Tentukan status kehadiran (Tepat Waktu atau Terlambat)
-	loc, _ := time.LoadLocation("Asia/Jakarta") // Zona waktu WIB
-	currentTimeInWIB := time.Now().In(loc)
+	// 6. Tentukan status kehadiran (Tepat Waktu atau Terlambat)
+	currentTimeInWIB := time.Now().In(wib)
+	scheduledStartTime, _ := time.ParseInLocation("15:04", todaysSchedule.StartTime, wib)
 	
-	// Parsing jam masuk dari jadwal. Format: "15:04"
-	scheduledStartTime, err := time.ParseInLocation("15:04", todaysSchedule.StartTime, loc)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memproses waktu jadwal."})
-	}
-	// Gabungkan dengan tanggal hari ini untuk perbandingan yang akurat
 	scheduledCheckInTime := time.Date(
 		currentTimeInWIB.Year(), currentTimeInWIB.Month(), currentTimeInWIB.Day(),
-		scheduledStartTime.Hour(), scheduledStartTime.Minute(), 0, 0, loc,
+		scheduledStartTime.Hour(), scheduledStartTime.Minute(), 0, 0, wib,
 	)
 
-	// Berikan toleransi keterlambatan (misalnya, 15 menit)
 	gracePeriod := 15 * time.Minute
 	latestCheckInTime := scheduledCheckInTime.Add(gracePeriod)
-
 	var attendanceStatus string
 	if currentTimeInWIB.After(latestCheckInTime) {
 		attendanceStatus = "Terlambat"
@@ -102,20 +120,14 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		attendanceStatus = "Tepat Waktu"
 	}
 
-	// ==================================================================
-	// ✨ AKHIR DARI LOGIKA BARU ✨
-	// ==================================================================
-
-	// 8. Proses CHECK-IN dengan status yang sudah ditentukan
-	checkInTimeFormatted := currentTimeInWIB.Format("15:04") // Format 24 jam untuk konsistensi
-
+	// 7. Proses Check-In
 	newAttendance := models.Attendance{
 		ID:        primitive.NewObjectID(),
 		UserID:    userID,
 		Date:      today,
-		CheckIn:   checkInTimeFormatted,
+		CheckIn:   currentTimeInWIB.Format("15:04"),
 		CheckOut:  "",
-		Status:    attendanceStatus, // <-- GUNAKAN STATUS YANG SUDAH DITENTUKAN
+		Status:    attendanceStatus,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -125,7 +137,6 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan check-in: " + err.Error()})
 	}
 
-	// 9. Berikan respons sukses check-in
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": fmt.Sprintf("Berhasil check-in pukul %s. Status: %s", newAttendance.CheckIn, newAttendance.Status),
 	})
