@@ -1,24 +1,26 @@
 package repository
 
 import (
-	"context"
-	"errors"
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
+	"context"
+	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var scheduleCollection = config.GetCollection(config.WorkScheduleCollection)
+type WorkScheduleRepository struct {
+	Collection *mongo.Collection
+}
 
-// WorkScheduleRepository struct kosong untuk mengimplementasikan method
-type WorkScheduleRepository struct{}
-
-// NewWorkScheduleRepository membuat instance baru dari WorkScheduleRepository
 func NewWorkScheduleRepository() *WorkScheduleRepository {
-	return &WorkScheduleRepository{}
+	coll := config.GetCollection(config.WorkScheduleCollection)
+	return &WorkScheduleRepository{
+		Collection: coll,
+	}
 }
 
 func (r *WorkScheduleRepository) Create(schedule *models.WorkSchedule) (*models.WorkSchedule, error) {
@@ -26,7 +28,7 @@ func (r *WorkScheduleRepository) Create(schedule *models.WorkSchedule) (*models.
 	schedule.CreatedAt = time.Now()
 	schedule.UpdatedAt = time.Now()
 
-	_, err := scheduleCollection.InsertOne(context.TODO(), schedule)
+	_, err := r.Collection.InsertOne(context.TODO(), schedule)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +42,7 @@ func (r *WorkScheduleRepository) FindByUserAndDate(userID primitive.ObjectID, da
 	}
 
 	var result models.WorkSchedule
-	err := scheduleCollection.FindOne(context.TODO(), filter).Decode(&result)
+	err := r.Collection.FindOne(context.TODO(), filter).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +52,7 @@ func (r *WorkScheduleRepository) FindByUserAndDate(userID primitive.ObjectID, da
 func (r *WorkScheduleRepository) FindByDate(date string) ([]*models.WorkSchedule, error) {
 	filter := bson.M{"date": date}
 
-	cursor, err := scheduleCollection.Find(context.TODO(), filter)
+	cursor, err := r.Collection.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +72,7 @@ func (r *WorkScheduleRepository) FindByDate(date string) ([]*models.WorkSchedule
 
 func (r *WorkScheduleRepository) FindByUser(userID primitive.ObjectID) ([]*models.WorkSchedule, error) {
 	filter := bson.M{"user_id": userID}
-	cursor, err := scheduleCollection.Find(context.TODO(), filter)
+	cursor, err := r.Collection.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +89,8 @@ func (r *WorkScheduleRepository) FindByUser(userID primitive.ObjectID) ([]*model
 	return results, nil
 }
 
-// ✨ Tambahkan method ini untuk mendukung filtering dinamis di GetAllWorkSchedules handler
 func (r *WorkScheduleRepository) FindAllWithFilter(filter bson.M) ([]models.WorkSchedule, error) {
-	cursor, err := scheduleCollection.Find(context.TODO(), filter)
+	cursor, err := r.Collection.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +103,6 @@ func (r *WorkScheduleRepository) FindAllWithFilter(filter bson.M) ([]models.Work
 	return schedules, nil
 }
 
-
 func (r *WorkScheduleRepository) UpdateByID(id primitive.ObjectID, payload *models.WorkScheduleUpdatePayload) error {
 	update := bson.M{
 		"$set": bson.M{
@@ -113,7 +113,7 @@ func (r *WorkScheduleRepository) UpdateByID(id primitive.ObjectID, payload *mode
 		},
 	}
 
-	result, err := scheduleCollection.UpdateByID(context.TODO(), id, update)
+	result, err := r.Collection.UpdateByID(context.TODO(), id, update)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (r *WorkScheduleRepository) FindByUserAndDateRange(userID primitive.ObjectI
 			"$lte": endDate,
 		},
 	}
-	cursor, err := scheduleCollection.Find(context.TODO(), filter)
+	cursor, err := r.Collection.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (r *WorkScheduleRepository) FindByUserAndDateRange(userID primitive.ObjectI
 }
 
 func (r *WorkScheduleRepository) DeleteByID(id primitive.ObjectID) error {
-	res, err := scheduleCollection.DeleteOne(context.TODO(), bson.M{"_id": id})
+	res, err := r.Collection.DeleteOne(context.TODO(), bson.M{"_id": id})
 	if err != nil {
 		return err
 	}
