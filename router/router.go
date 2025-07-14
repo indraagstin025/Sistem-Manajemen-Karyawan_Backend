@@ -27,7 +27,7 @@ func SetupRoutes(app *fiber.App) {
 	authHandler := handlers.NewAuthHandler(userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, deptRepo, leaveRepo)
 	deptHandler := handlers.NewDepartmentHandler(deptRepo)
-	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo)
+	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo, workScheduleRepo) 
 	leaveHandler := handlers.NewLeaveRequestHandler(leaveRepo, attendanceRepo)
 	fileHandler := handlers.NewFileHandler()
 	workScheduleHandler := handlers.NewWorkScheduleHandler(workScheduleRepo)
