@@ -26,22 +26,29 @@ func NewWorkScheduleHandler(repo *repository.WorkScheduleRepository) *WorkSchedu
 	}
 }
 
-// Buat jadwal kerja baru (Admin Only)
-// Ini sekarang adalah method dari WorkScheduleHandler
 func (h *WorkScheduleHandler) CreateWorkSchedule(c *fiber.Ctx) error {
 	var payload models.WorkScheduleCreatePayload
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format data tidak valid", "details": err.Error()})
 	}
 
-	userID, err := primitive.ObjectIDFromHex(payload.UserID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "UserID tidak valid"})
-	}
+	// Validasi tambahan untuk payload jika diperlukan...
+	// validate := validator.New()
+	// if err := validate.Struct(payload); err != nil {
+	// 	 return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Validasi gagal: " + err.Error()})
+	// }
+
+	// Logika untuk memproses UserID DIHAPUS karena sudah tidak ada lagi.
+	/*
+		userID, err := primitive.ObjectIDFromHex(payload.UserID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "UserID tidak valid"})
+		}
+	*/
 
 	schedule := models.WorkSchedule{
 		ID:        primitive.NewObjectID(),
-		UserID:    userID,
+		// UserID:    userID, // <-- DIHAPUS
 		Date:      strings.TrimSpace(payload.Date),
 		StartTime: strings.TrimSpace(payload.StartTime),
 		EndTime:   strings.TrimSpace(payload.EndTime),
