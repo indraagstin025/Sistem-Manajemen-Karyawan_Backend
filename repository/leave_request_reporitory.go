@@ -25,6 +25,8 @@ type LeaveRequestRepository interface {
 	UpdateAttachmentURL(id primitive.ObjectID, fileURL string) (*mongo.UpdateResult, error)
 	CountPendingRequests(ctx context.Context) (int64, error)
 	FindByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.LeaveRequest, error)
+	FindByUserAndDateAndType(ctx context.Context, userID primitive.ObjectID, date string, requestType string) (*models.LeaveRequest, error)
+
 }
 
 
@@ -149,6 +151,32 @@ func (r *leaveRequestRepository) FindByID(id primitive.ObjectID) (*models.LeaveR
 	}
 	return &request, nil
 }
+
+func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, userID primitive.ObjectID, date string, requestType string) (*models.LeaveRequest, error) {
+	filter := bson.M{
+		"user_id":      userID,
+		"request_type": requestType,
+		"$or": []bson.M{
+			{"start_date": date},
+			{"end_date": date},
+			{
+				"start_date": bson.M{"$lte": date},
+				"end_date":   bson.M{"$gte": date},
+			},
+		},
+	}
+
+	var result models.LeaveRequest
+	err := r.collection.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("gagal mencari pengajuan berdasarkan user, tanggal, dan jenis: %w", err)
+	}
+	return &result, nil
+}
+
 
 func (r *leaveRequestRepository) UpdateStatus(id primitive.ObjectID, status string, note string) (*mongo.UpdateResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

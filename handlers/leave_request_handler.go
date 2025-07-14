@@ -60,6 +60,19 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		})
 	}
 
+	// ❗ Validasi duplikasi pengajuan (hanya untuk tanggal mulai)
+	existingRequest, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, startDate, requestType)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal memeriksa pengajuan sebelumnya",
+		})
+	}
+	if existingRequest != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("Anda sudah mengajukan %s untuk tanggal %s. Hanya satu pengajuan per hari diperbolehkan.", requestType, startDate),
+		})
+	}
+
 	var attachmentURL string
 	file, _ := c.FormFile("attachment")
 
@@ -83,7 +96,6 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung"})
 		}
 
-		// Validasi khusus untuk Sakit (harus PDF)
 		if requestType == "Sakit" && ext != ".pdf" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan Sakit harus berupa file PDF"})
 		}
@@ -91,13 +103,11 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		// Upload file ke GridFS
 		bucket, err := config.GetGridFSBucket()
 		if err != nil {
-			log.Printf("ERROR: Gagal mendapatkan bucket GridFS: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses penyimpanan file"})
 		}
 
 		src, err := file.Open()
 		if err != nil {
-			log.Printf("ERROR: Gagal membuka file: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuka file"})
 		}
 		defer src.Close()
@@ -105,13 +115,11 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		uploadFileName := fmt.Sprintf("%d_%s", time.Now().Unix(), strings.ReplaceAll(file.Filename, " ", "_"))
 		uploadStream, err := bucket.OpenUploadStream(uploadFileName)
 		if err != nil {
-			log.Printf("ERROR: Gagal membuka stream GridFS: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal upload file"})
 		}
 		defer uploadStream.Close()
 
 		if _, err := io.Copy(uploadStream, src); err != nil {
-			log.Printf("ERROR: Gagal menyalin ke GridFS: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan file"})
 		}
 
@@ -136,7 +144,6 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 
 	_, createErr := h.leaveRepo.Create(newRequest)
 	if createErr != nil {
-		log.Printf("ERROR: Gagal menyimpan leave request ke DB: %v", createErr)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan data pengajuan"})
 	}
 
@@ -145,6 +152,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		"request": newRequest,
 	})
 }
+
 
 
 // GetAllLeaveRequests godoc
