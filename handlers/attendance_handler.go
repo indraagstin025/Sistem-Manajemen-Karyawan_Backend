@@ -205,6 +205,24 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 	})
 }
 
+// Tambahkan fungsi ini di attendance_handler.go
+func (h *AttendanceHandler) GetMyTodayAttendance(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*models.Claims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi"})
+	}
+
+	today := time.Now().In(time.FixedZone("WIB", 7*60*60)).Format("2006-01-02")
+	
+	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), claims.UserID, today)
+	if err != nil {
+		// Jika tidak ditemukan, anggap saja "Belum Absen", bukan error server
+		return c.Status(fiber.StatusOK).JSON(nil)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(attendance)
+}
+
 // GetTodayAttendance godoc
 // @Summary Get Today's Attendance List
 // @Description Mengambil daftar kehadiran karyawan untuk hari ini dengan detail user
