@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 
-	"Sistem-Manajemen-Karyawan/config/middleware"
-	"Sistem-Manajemen-Karyawan/handlers"	
+	"Sistem-Manajemen-Karyawan/config/middleware" // Pastikan ini path yang benar
+	"Sistem-Manajemen-Karyawan/handlers"
 	"Sistem-Manajemen-Karyawan/repository"
 
-	_ "Sistem-Manajemen-Karyawan/docs"
+	_ "Sistem-Manajemen-Karyawan/docs" // Untuk dokumentasi Swagger
 )
 
 func SetupRoutes(app *fiber.App) {
@@ -21,6 +21,7 @@ func SetupRoutes(app *fiber.App) {
 	deptRepo := repository.NewDepartmentRepository()
 	attendanceRepo := repository.NewAttendanceRepository()
 	leaveRepo := repository.NewLeaveRequestRepository()
+	workScheduleRepo := repository.NewWorkScheduleRepository() // Menggunakan nama variabel yang lebih ringkas
 
 	// Inisialisasi Handlers
 	authHandler := handlers.NewAuthHandler(userRepo)
@@ -29,6 +30,7 @@ func SetupRoutes(app *fiber.App) {
 	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo)
 	leaveHandler := handlers.NewLeaveRequestHandler(leaveRepo, attendanceRepo)
 	fileHandler := handlers.NewFileHandler()
+	workScheduleHandler := handlers.NewWorkScheduleHandler(workScheduleRepo)// Inisialisasi handler jadwal kerja
 
 	// Health check & Docs
 	app.Get("/", func(c *fiber.Ctx) error {
@@ -41,17 +43,10 @@ func SetupRoutes(app *fiber.App) {
 	app.Get("/docs/*", swagger.HandlerDefault)
 	app.Static("/uploads", "./uploads")
 
-
-	// Akses file dari GridFS berdasarkan fileID
-
-
-
 	// API v1 group
 	api := app.Group("/api/v1")
 
-
-
-	// === TAMBAHKAN INI: Rute baru untuk mengakses file dari GridFS ===
+	// === Rute untuk mengakses file dari GridFS ===
 	// Diberi middleware agar hanya pengguna yang sudah login yang bisa mengakses
 	api.Get("/files/:id", middleware.AuthMiddleware(), fileHandler.GetFileFromGridFS)
 	api.Get("/attachments/:filename", middleware.AuthMiddleware(), fileHandler.GetFileByFilename)
@@ -83,29 +78,44 @@ func SetupRoutes(app *fiber.App) {
 	adminGroup.Delete("/departments/:id", deptHandler.DeleteDepartment)
 
 	// ======================================================
-	// PERBAIKAN: Rute Kehadiran Karyawan
+	// Rute Kehadiran Karyawan
 	// ======================================================
-	// Middleware autentikasi diterapkan ke seluruh grup
 	attendanceGroup := api.Group("/attendance", middleware.AuthMiddleware())
-
-	// Rute untuk semua pengguna yang sudah login
 	attendanceGroup.Post("/scan", attendanceHandler.ScanQRCode)
 	attendanceGroup.Get("/my-history", attendanceHandler.GetMyAttendanceHistory)
-
-	// Rute khusus admin (middleware admin ditambahkan di sini)
 	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware())
 	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
 	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance)
-	// ======================================================
 
+	// ======================================================
 	// Rute untuk Pengajuan Izin, Cuti, dan Sakit
+	// ======================================================
 	leaveGroup := api.Group("/leave-requests", middleware.AuthMiddleware())
 	leaveGroup.Post("/", leaveHandler.CreateLeaveRequest)
 	leaveGroup.Post("/:id/attachment", leaveHandler.UploadAttachment)
-	leaveGroup.Get("/my-requests", leaveHandler.GetMyLeaveRequests) 
+	leaveGroup.Get("/my-requests", leaveHandler.GetMyLeaveRequests)
 	adminLeaveGroup := leaveGroup.Group("/", middleware.AdminMiddleware())
 	adminLeaveGroup.Get("/", leaveHandler.GetAllLeaveRequests)
 	adminLeaveGroup.Put("/:id/status", leaveHandler.UpdateLeaveRequestStatus)
+
+	// ======================================================
+	// ✨ Rute untuk Jadwal Kerja (Work Schedules) ✨
+	// ======================================================
+	workScheduleGroup := api.Group("/work-schedules")
+
+	// Rute Admin untuk Jadwal Kerja
+	adminWorkScheduleGroup := workScheduleGroup.Group("/", middleware.AuthMiddleware(), middleware.AdminMiddleware())
+	adminWorkScheduleGroup.Post("/", workScheduleHandler.CreateWorkSchedule)
+	adminWorkScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
+	adminWorkScheduleGroup.Put("/:id", workScheduleHandler.UpdateWorkSchedule)
+	adminWorkScheduleGroup.Delete("/:id", workScheduleHandler.DeleteWorkSchedule)
+
+	// Rute Karyawan untuk Jadwal Kerja
+	workScheduleGroup.Get("/my", middleware.AuthMiddleware(), workScheduleHandler.GetMyWorkSchedules)
+
+	// Rute Karyawan untuk Jadwal Kerja
+	// Karyawan hanya bisa melihat jadwal kerjanya sendiri
+	
 
 	log.Println("Semua rute aplikasi berhasil didaftarkan.")
 	log.Println("Routes yang tersedia:")
@@ -124,12 +134,18 @@ func SetupRoutes(app *fiber.App) {
 	log.Println("- GET /api/v1/departments (protected)")
 	log.Println("- GET /api/v1/departments/:id (protected)")
 	log.Println("- POST /api/v1/attendance/scan (protected)")
-	log.Println("- GET /api/v1/attendance/my-history (protected)") // Sekarang sudah benar
-	log.Println("- POST /api/v1/attendance/generate-qr (admin only)")
-	log.Println("- GET /api/v1/attendance/today (admin only)")
+	log.Println("- GET /api/v1/attendance/my-history (protected)")
+	log.Println("- GET /api/v1/admin/attendance/generate-qr (admin only)")
+	log.Println("- GET /api/v1/admin/attendance/today (admin only)")
 	log.Println("- POST /api/v1/leave-requests (protected)")
 	log.Println("- POST /api/v1/leave-requests/:id/attachment (protected)")
-	log.Println("- GET /api/v1/leave-requests (admin only)")
-	log.Println("- PUT /api/v1/leave-requests/:id/status (admin only)")
+	log.Println("- GET /api/v1/leave-requests/my-requests (protected)")
+	log.Println("- GET /api/v1/admin/leave-requests (admin only)")
+	log.Println("- PUT /api/v1/admin/leave-requests/:id/status (admin only)")
+	log.Println("- POST /api/v1/work-schedules (admin only)")        // Jadwal Kerja (Admin)
+	log.Println("- GET /api/v1/work-schedules (admin only)")         // Jadwal Kerja (Admin)
+	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")    // Jadwal Kerja (Admin)
+	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)") // Jadwal Kerja (Admin)
+	log.Println("- GET /api/v1/work-schedules/my (protected)")      // Jadwal Kerja (Karyawan)
 	log.Println("Swagger documentation tersedia di: /docs/index.html")
 }

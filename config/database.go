@@ -25,6 +25,7 @@ var AttendanceCollection string = "attendances"
 var SalaryCollection string = "salaries"
 var LeaveRequestCollection string = "leave_requests"
 var QRCodeCollection string = "qr_codes"
+var WorkScheduleCollection string = "work_schedule"
 
 func MongoConnect() {
 	mongoURI := os.Getenv("MONGOSTRING")
