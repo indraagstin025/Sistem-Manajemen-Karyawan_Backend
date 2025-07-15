@@ -101,15 +101,15 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	}
 
 	// Proses Check-In
-	newAttendance := models.Attendance{
-		ID:        primitive.NewObjectID(),
-		UserID:    userID,
-		Date:      today,
-		CheckIn:   currentTimeInWIB.Format("15:04"),
-		Status:    attendanceStatus,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
+newAttendance := models.Attendance{
+	ID:        primitive.NewObjectID(),
+	UserID:    userID,
+	Date:      today,
+	CheckIn:   currentTimeInWIB.Format("15:04"),
+	Status:    attendanceStatus,
+	CreatedAt: currentTimeInWIB,  // ✅ waktu lokal (WIB)
+	UpdatedAt: currentTimeInWIB,  // ✅ waktu lokal (WIB)
+}
 
 	_, err = h.repo.CreateAttendance(c.Context(), &newAttendance)
 	if err != nil {
@@ -290,7 +290,9 @@ func (h *AttendanceHandler) GetMyTodayAttendance(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi"})
 	}
 
-	today := time.Now().In(time.FixedZone("WIB", 7*60*60)).Format("2006-01-02")
+	wib, _ := time.LoadLocation("Asia/Jakarta")
+today := time.Now().In(wib).Format("2006-01-02")
+
 	
 	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), claims.UserID, today)
 	if err != nil {
