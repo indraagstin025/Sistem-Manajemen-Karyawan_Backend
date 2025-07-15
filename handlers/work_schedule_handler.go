@@ -94,6 +94,29 @@ func getHolidayMap(year string) (map[string]bool, error) {
 	return holidayMap, nil
 }
 
+// handlers/workschedule_handler.go
+
+// ... (existing imports and WorkScheduleHandler struct)
+
+// GetWorkScheduleById mendapatkan satu aturan jadwal kerja berdasarkan ID
+func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
+    scheduleID := c.Params("id")
+    objectID, err := primitive.ObjectIDFromHex(scheduleID)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID jadwal kerja tidak valid"})
+    }
+
+    schedule, err := h.workScheduleRepo.FindByID(objectID) // Asumsikan ada metode FindByID di repository Anda
+    if err != nil {
+        if err.Error() == "not found" { // Sesuaikan pesan error dari repository jika tidak ditemukan
+            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Jadwal kerja tidak ditemukan"})
+        }
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil jadwal kerja", "details": err.Error()})
+    }
+
+    return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": schedule})
+}
+
 // ## GetAllWorkSchedules Dirombak Total untuk Logika Otomatis ##
 func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 	layout := "2006-01-02"

@@ -27,7 +27,7 @@ func SetupRoutes(app *fiber.App) {
 	authHandler := handlers.NewAuthHandler(userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, deptRepo, leaveRepo)
 	deptHandler := handlers.NewDepartmentHandler(deptRepo)
-	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo, workScheduleRepo) 
+	attendanceHandler := handlers.NewAttendanceHandler(attendanceRepo, workScheduleRepo)
 	leaveHandler := handlers.NewLeaveRequestHandler(leaveRepo, attendanceRepo)
 	fileHandler := handlers.NewFileHandler()
 	workScheduleHandler := handlers.NewWorkScheduleHandler(workScheduleRepo)
@@ -41,7 +41,7 @@ func SetupRoutes(app *fiber.App) {
 		})
 	})
 	app.Get("/docs/*", swagger.HandlerDefault)
-	app.Static("/uploads", "./uploads")
+	app.Static("/uploads", "./uploads") // Melayani file statis dari folder uploads
 
 	// Grup API v1
 	api := app.Group("/api/v1")
@@ -70,8 +70,8 @@ func SetupRoutes(app *fiber.App) {
 	adminGroup.Get("/dashboard-stats", userHandler.GetDashboardStats)
 
 	// Rute Departemen
-	api.Get("/departments", middleware.AuthMiddleware(), deptHandler.GetAllDepartments)
-	api.Get("/departments/:id", middleware.AuthMiddleware(), deptHandler.GetDepartmentByID)
+	api.Get("/departments", middleware.AuthMiddleware(), deptHandler.GetAllDepartments) // Dapat diakses semua role terautentikasi
+	api.Get("/departments/:id", middleware.AuthMiddleware(), deptHandler.GetDepartmentByID) // Dapat diakses semua role terautentikasi
 	adminGroup.Post("/departments", deptHandler.CreateDepartment)
 	adminGroup.Put("/departments/:id", deptHandler.UpdateDepartment)
 	adminGroup.Delete("/departments/:id", deptHandler.DeleteDepartment)
@@ -80,18 +80,19 @@ func SetupRoutes(app *fiber.App) {
 	attendanceGroup := api.Group("/attendance", middleware.AuthMiddleware())
 	attendanceGroup.Post("/scan", attendanceHandler.ScanQRCode)
 	attendanceGroup.Get("/my-history", attendanceHandler.GetMyAttendanceHistory)
-	// Tambahkan ini di grup rute attendance
-	attendanceGroup.Get("/my-today", attendanceHandler.GetMyTodayAttendance)
-	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware())
+	attendanceGroup.Get("/my-today", attendanceHandler.GetMyTodayAttendance) // Endpoint untuk karyawan melihat status absensi hari ini
+
+	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware()) // Grup khusus admin untuk absensi
 	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
-	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance)
+	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance) // Laporan absensi hari ini untuk admin
 
 	// Rute Pengajuan Cuti & Izin
 	leaveGroup := api.Group("/leave-requests", middleware.AuthMiddleware())
 	leaveGroup.Post("/", leaveHandler.CreateLeaveRequest)
 	leaveGroup.Post("/:id/attachment", leaveHandler.UploadAttachment)
 	leaveGroup.Get("/my-requests", leaveHandler.GetMyLeaveRequests)
-	adminLeaveGroup := leaveGroup.Group("/", middleware.AdminMiddleware())
+
+	adminLeaveGroup := leaveGroup.Group("/", middleware.AdminMiddleware()) // Grup khusus admin untuk cuti/izin
 	adminLeaveGroup.Get("/", leaveHandler.GetAllLeaveRequests)
 	adminLeaveGroup.Put("/:id/status", leaveHandler.UpdateLeaveRequestStatus)
 
@@ -100,44 +101,66 @@ func SetupRoutes(app *fiber.App) {
 	// ======================================================
 	workScheduleGroup := api.Group("/work-schedules", middleware.AuthMiddleware())
 
-	// Rute untuk SEMUA PENGGUNA (Admin & Karyawan) untuk MELIHAT jadwal
-	// Endpoint ini sekarang cerdas dan otomatis memfilter hari libur
+	// Rute untuk SEMUA PENGGUNA TERAUTENTIKASI (Admin & Karyawan) untuk MELIHAT jadwal
+	// Endpoint ini cerdas dan otomatis memfilter hari libur.
 	workScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
 
 	// Rute KHUSUS ADMIN untuk MENGELOLA (Create, Update, Delete) aturan jadwal
+	// Perhatikan: GET /:id juga harus dilindungi admin jika hanya admin yang boleh melihat detail aturan
 	workScheduleGroup.Post("/", middleware.AdminMiddleware(), workScheduleHandler.CreateWorkSchedule)
 	workScheduleGroup.Put("/:id", middleware.AdminMiddleware(), workScheduleHandler.UpdateWorkSchedule)
 	workScheduleGroup.Delete("/:id", middleware.AdminMiddleware(), workScheduleHandler.DeleteWorkSchedule)
-	
+	// --- MENAMBAHKAN RUTE BARU UNTUK MENGAMBIL DETAIL SATU ATURAN JADWAL ---
+	workScheduleGroup.Get("/:id", middleware.AdminMiddleware(), workScheduleHandler.GetWorkScheduleById) // <-- Rute ini ditambahkan
+
 	log.Println("Semua rute aplikasi berhasil didaftarkan.")
 
+	// ======================================================
+	// LOG RUTE YANG TELAH DIPERBAIKI DAN DITAMBAHKAN
+	// ======================================================
 	log.Println("Routes yang tersedia:")
+	log.Println("- GET /")
+	log.Println("- GET /docs/*")
+	log.Println("- GET /uploads (static files)")
+	log.Println("- GET /api/v1/files/:id (protected)")
+	log.Println("- GET /api/v1/attachments/:filename (protected)")
+
 	log.Println("- POST /api/v1/auth/register")
 	log.Println("- POST /api/v1/auth/login")
+
 	log.Println("- POST /api/v1/users/change-password (protected)")
 	log.Println("- GET /api/v1/users/:id (protected)")
 	log.Println("- PUT /api/v1/users/:id (protected)")
 	log.Println("- POST /api/v1/users/:id/upload-photo (protected)")
+	log.Println("- GET /api/v1/users/:id/photo (protected)")
+
 	log.Println("- GET /api/v1/admin/users (admin only)")
 	log.Println("- DELETE /api/v1/admin/users/:id (admin only)")
 	log.Println("- GET /api/v1/admin/dashboard-stats (admin only)")
+
+	log.Println("- GET /api/v1/departments (protected)")
+	log.Println("- GET /api/v1/departments/:id (protected)")
 	log.Println("- POST /api/v1/admin/departments (admin only)")
 	log.Println("- PUT /api/v1/admin/departments/:id (admin only)")
 	log.Println("- DELETE /api/v1/admin/departments/:id (admin only)")
-	log.Println("- GET /api/v1/departments (protected)")
-	log.Println("- GET /api/v1/departments/:id (protected)")
+
 	log.Println("- POST /api/v1/attendance/scan (protected)")
 	log.Println("- GET /api/v1/attendance/my-history (protected)")
+	log.Println("- GET /api/v1/attendance/my-today (protected)")
 	log.Println("- GET /api/v1/admin/attendance/generate-qr (admin only)")
 	log.Println("- GET /api/v1/admin/attendance/today (admin only)")
+
 	log.Println("- POST /api/v1/leave-requests (protected)")
 	log.Println("- POST /api/v1/leave-requests/:id/attachment (protected)")
 	log.Println("- GET /api/v1/leave-requests/my-requests (protected)")
 	log.Println("- GET /api/v1/admin/leave-requests (admin only)")
 	log.Println("- PUT /api/v1/admin/leave-requests/:id/status (admin only)")
-	log.Println("- POST /api/v1/work-schedules (admin only)")        // Jadwal Kerja (Admin)
-	log.Println("- GET /api/v1/work-schedules (admin only)")         // Jadwal Kerja (Admin)
-	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")    // Jadwal Kerja (Admin)
-	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)") // Jadwal Kerja (Admin)    // Jadwal Kerja (Karyawan)
+
+	log.Println("- GET /api/v1/work-schedules (protected)")           // Melihat jadwal kerja (semua terautentikasi)
+	log.Println("- GET /api/v1/work-schedules/:id (admin only)")      // Melihat detail aturan jadwal kerja (admin only)
+	log.Println("- POST /api/v1/work-schedules (admin only)")         // Membuat aturan jadwal kerja (admin only)
+	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")      // Memperbarui aturan jadwal kerja (admin only)
+	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)")   // Menghapus aturan jadwal kerja (admin only)
+
 	log.Println("Swagger documentation tersedia di: /docs/index.html")
 }

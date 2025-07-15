@@ -123,6 +123,23 @@ func (r *WorkScheduleRepository) UpdateByID(id primitive.ObjectID, payload *mode
 	return nil
 }
 
+func (r *WorkScheduleRepository) FindByID(id primitive.ObjectID) (*models.WorkSchedule, error) {
+	filter := bson.M{"_id": id} // Filter berdasarkan field _id
+
+	var result models.WorkSchedule
+	err := r.Collection.FindOne(context.TODO(), filter).Decode(&result)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// Mengembalikan error spesifik jika dokumen tidak ditemukan
+			return nil, errors.New("jadwal tidak ditemukan")
+		}
+		// Mengembalikan error lain jika ada masalah teknis
+		return nil, err
+	}
+	return &result, nil
+}
+
+
 func (r *WorkScheduleRepository) FindByUserAndDateRange(userID primitive.ObjectID, startDate, endDate string) ([]*models.WorkSchedule, error) {
 	filter := bson.M{
 		"user_id": userID,
