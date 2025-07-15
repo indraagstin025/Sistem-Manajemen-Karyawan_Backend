@@ -1,67 +1,70 @@
 package handlers
 
 import (
-	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/repository"
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"strings"
-	"time"
+    "Sistem-Manajemen-Karyawan/models"
+    "Sistem-Manajemen-Karyawan/repository"
+    "encoding/json"
+    "io/ioutil"
+    "net/http"
+    "strings"
+    "time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
-	"github.com/teambition/rrule-go"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+    "github.com/go-playground/validator/v10"
+    "github.com/gofiber/fiber/v2"
+    "github.com/teambition/rrule-go"
+    "go.mongodb.org/mongo-driver/bson"
+    "go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type WorkScheduleHandler struct {
-	workScheduleRepo *repository.WorkScheduleRepository
+    workScheduleRepo *repository.WorkScheduleRepository
 }
 
 func NewWorkScheduleHandler(repo *repository.WorkScheduleRepository) *WorkScheduleHandler {
-	return &WorkScheduleHandler{
-		workScheduleRepo: repo,
-	}
+    return &WorkScheduleHandler{
+        workScheduleRepo: repo,
+    }
 }
 
 // ## CreateWorkSchedule Diperbarui untuk Menyimpan Aturan Perulangan ##
 func (h *WorkScheduleHandler) CreateWorkSchedule(c *fiber.Ctx) error {
-	var payload models.WorkScheduleCreatePayload
-	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format data tidak valid", "details": err.Error()})
-	}
+    var payload models.WorkScheduleCreatePayload
+    if err := c.BodyParser(&payload); err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format data tidak valid", "details": err.Error()})
+    }
 
-	schedule := models.WorkSchedule{
-		ID:             primitive.NewObjectID(),
-		Date:           strings.TrimSpace(payload.Date),
-		StartTime:      strings.TrimSpace(payload.StartTime),
-		EndTime:        strings.TrimSpace(payload.EndTime),
-		Note:           payload.Note,
-		RecurrenceRule: payload.RecurrenceRule, // Menyimpan aturan perulangan
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	}
+    schedule := models.WorkSchedule{
+        ID:             primitive.NewObjectID(),
+        Date:           strings.TrimSpace(payload.Date),
+        StartTime:      strings.TrimSpace(payload.StartTime),
+        EndTime:        strings.TrimSpace(payload.EndTime),
+        Note:           payload.Note,
+        RecurrenceRule: payload.RecurrenceRule, // Menyimpan aturan perulangan
+        CreatedAt:      time.Now(),
+        UpdatedAt:      time.Now(),
+    }
 
-	createdSchedule, err := h.workScheduleRepo.Create(&schedule)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan jadwal kerja", "details": err.Error()})
-	}
+    createdSchedule, err := h.workScheduleRepo.Create(&schedule)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan jadwal kerja", "details": err.Error()})
+    }
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Jadwal kerja berhasil ditambahkan", "data": createdSchedule})
+    return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Jadwal kerja berhasil ditambahkan", "data": createdSchedule})
 }
 
-// Struct pembantu untuk data libur dari API eksternal
-type Holiday struct {
-	Date string `json:"holiday_date"`
-	Name string `json:"holiday_name"`
+// ======================================================================================
+// Fungsi dan Struct Terkait Hari Libur
+// ======================================================================================
+
+// Struct pembantu untuk data libur dari API eksternal (lokal untuk parsing)
+type HolidayAPIData struct {
+	Date              string `json:"holiday_date"`
+	Name              string `json:"holiday_name"`
+	IsNationalHoliday bool `json:"is_national_holiday"`
 }
 
-// Fungsi pembantu untuk mengambil dan memetakan hari libur agar mudah dicek
-func getHolidayMap(year string) (map[string]bool, error) {
-	holidayMap := make(map[string]bool)
-	// API ini gratis dan tidak butuh API Key
+// Fungsi pembantu untuk mengambil hari libur dari API eksternal dan mengembalikan slice models.Holiday
+func getExternalHolidaysForFrontend(year string) ([]models.Holiday, error) {
 	resp, err := http.Get("https://api-harilibur.vercel.app/api?year=" + year)
 	if err != nil {
 		return nil, err
@@ -73,48 +76,85 @@ func getHolidayMap(year string) (map[string]bool, error) {
 		return nil, err
 	}
 
-	var holidays []Holiday
-	// Filter hanya yang is_national_holiday: true
-	var rawHolidays []map[string]interface{}
+	var rawHolidays []HolidayAPIData
+	if err := json.Unmarshal(body, &rawHolidays); err != nil {
+		return nil, err
+	}
+
+	var holidays []models.Holiday
+	for _, rawHoliday := range rawHolidays {
+		if rawHoliday.IsNationalHoliday {
+			holidays = append(holidays, models.Holiday{
+				Date: rawHoliday.Date,
+				Name: rawHoliday.Name,
+			})
+		}
+	}
+	return holidays, nil
+}
+
+// Fungsi pembantu untuk mengambil dan memetakan hari libur agar mudah dicek (untuk filter internal)
+func getHolidayMap(year string) (map[string]bool, error) {
+	holidayMap := make(map[string]bool)
+	resp, err := http.Get("https://api-harilibur.vercel.app/api?year=" + year)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawHolidays []HolidayAPIData
 	if err := json.Unmarshal(body, &rawHolidays); err != nil {
 		return nil, err
 	}
 	for _, rawHoliday := range rawHolidays {
-		if isNational, ok := rawHoliday["is_national_holiday"].(bool); ok && isNational {
-			holidays = append(holidays, Holiday{
-				Date: rawHoliday["holiday_date"].(string),
-				Name: rawHoliday["holiday_name"].(string),
-			})
+		if rawHoliday.IsNationalHoliday {
+			holidayMap[rawHoliday.Date] = true
 		}
 	}
 
-	for _, h := range holidays {
-		holidayMap[h.Date] = true
-	}
 	return holidayMap, nil
 }
 
-// handlers/workschedule_handler.go
+// GetHolidays adalah handler baru untuk melayani data hari libur ke frontend
+func (h *WorkScheduleHandler) GetHolidays(c *fiber.Ctx) error {
+	year := c.Query("year")
+	if year == "" {
+		year = time.Now().Format("2006")
+	}
 
-// ... (existing imports and WorkScheduleHandler struct)
+	holidaysData, err := getExternalHolidaysForFrontend(year)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil data hari libur", "details": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(holidaysData)
+}
+
+// ======================================================================================
+// Akhir Fungsi dan Struct Terkait Hari Libur
+// ======================================================================================
 
 // GetWorkScheduleById mendapatkan satu aturan jadwal kerja berdasarkan ID
 func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
-    scheduleID := c.Params("id")
-    objectID, err := primitive.ObjectIDFromHex(scheduleID)
-    if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID jadwal kerja tidak valid"})
-    }
+	scheduleID := c.Params("id")
+	objectID, err := primitive.ObjectIDFromHex(scheduleID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID jadwal kerja tidak valid"})
+	}
 
-    schedule, err := h.workScheduleRepo.FindByID(objectID) // Asumsikan ada metode FindByID di repository Anda
-    if err != nil {
-        if err.Error() == "not found" { // Sesuaikan pesan error dari repository jika tidak ditemukan
-            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Jadwal kerja tidak ditemukan"})
-        }
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil jadwal kerja", "details": err.Error()})
-    }
+	schedule, err := h.workScheduleRepo.FindByID(objectID)
+	if err != nil {
+		if err.Error() == "jadwal tidak ditemukan" {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Jadwal kerja tidak ditemukan"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil jadwal kerja", "details": err.Error()})
+	}
 
-    return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": schedule})
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": schedule})
 }
 
 // ## GetAllWorkSchedules Dirombak Total untuk Logika Otomatis ##
@@ -196,8 +236,6 @@ func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": finalSchedules})
 }
 
-// GetMyWorkSchedules sudah tidak relevan dan bisa dihapus
-
 // Fungsi Update dan Delete tetap ada, berguna untuk mengubah/menghapus aturan perulangan itu sendiri.
 func (h *WorkScheduleHandler) UpdateWorkSchedule(c *fiber.Ctx) error {
 	scheduleID := c.Params("id")
@@ -213,10 +251,17 @@ func (h *WorkScheduleHandler) UpdateWorkSchedule(c *fiber.Ctx) error {
 
 	validate := validator.New()
 	if err := validate.Struct(payload); err != nil {
+		// Jika Anda tidak memiliki config.ValidatorErrors, gunakan ini untuk respons validasi sederhana
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Validasi gagal: " + err.Error()})
+		// Atau, jika Anda punya fungsi kustom untuk error validasi:
+		// return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		// 	"error":   "Validasi gagal",
+		// 	"details": yourCustomValidationErrorParser(err),
+		// })
 	}
 
-	err = h.workScheduleRepo.UpdateByID(objectID, &payload)
+	// Langsung gunakan payload yang sudah divalidasi
+	err = h.workScheduleRepo.UpdateByID(objectID, &payload) // Kirim payload langsung ke repository
 	if err != nil {
 		if strings.Contains(err.Error(), "jadwal tidak ditemukan") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Jadwal tidak ditemukan"})
