@@ -85,6 +85,7 @@ func SetupRoutes(app *fiber.App) {
 	adminAttendanceGroup := attendanceGroup.Group("/", middleware.AdminMiddleware()) // Grup khusus admin untuk absensi
 	adminAttendanceGroup.Get("/generate-qr", attendanceHandler.GenerateQRCode)
 	adminAttendanceGroup.Get("/today", attendanceHandler.GetTodayAttendance) // Laporan absensi hari ini untuk admin
+	adminAttendanceGroup.Get("/history", attendanceHandler.GetAttendanceHistoryForAdmin) // Riwayat absensi semua karyawan untuk admin
 
 	// Rute Pengajuan Cuti & Izin
 	leaveGroup := api.Group("/leave-requests", middleware.AuthMiddleware())
@@ -154,6 +155,7 @@ func SetupRoutes(app *fiber.App) {
 	log.Println("- GET /api/v1/attendance/my-today (protected)")
 	log.Println("- GET /api/v1/admin/attendance/generate-qr (admin only)")
 	log.Println("- GET /api/v1/admin/attendance/today (admin only)")
+	log.Println("- GET /api/v1/admin/attendance/history (admin only)") 
 
 	log.Println("- POST /api/v1/leave-requests (protected)")
 	log.Println("- POST /api/v1/leave-requests/:id/attachment (protected)")

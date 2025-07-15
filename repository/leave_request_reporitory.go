@@ -26,9 +26,10 @@ type LeaveRequestRepository interface {
 	CountPendingRequests(ctx context.Context) (int64, error)
 	FindByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.LeaveRequest, error)
 	FindByUserAndDateAndType(ctx context.Context, userID primitive.ObjectID, date string, requestType string) (*models.LeaveRequest, error)
-
+	// --- TAMBAH INI KE INTERFACE ---
+	CountByUserIDMonthAndType(ctx context.Context, userID primitive.ObjectID, year int, month time.Month, requestType string) (int64, error)
+	// --- AKHIR TAMBAHAN ---
 }
-
 
 type leaveRequestRepository struct {
 	collection *mongo.Collection
@@ -37,7 +38,6 @@ type leaveRequestRepository struct {
 func NewLeaveRequestRepository() LeaveRequestRepository {
 	return &leaveRequestRepository{
 		collection: config.GetCollection(config.LeaveRequestCollection),
-	
 	}
 }
 
@@ -53,7 +53,7 @@ func (r *leaveRequestRepository) FindAll() ([]models.LeaveRequestWithUser, error
 	defer cancel()
 
 	var requests []models.LeaveRequestWithUser
-	
+
 	pipeline := mongo.Pipeline{
 		bson.D{{
 			Key: "$lookup",
@@ -68,7 +68,7 @@ func (r *leaveRequestRepository) FindAll() ([]models.LeaveRequestWithUser, error
 			Key: "$unwind",
 			Value: bson.D{
 				{Key: "path", Value: "$user_info"},
-				{Key: "preserveNullAndEmptyArrays", Value: false}, 
+				{Key: "preserveNullAndEmptyArrays", Value: false},
 			},
 		}},
 		bson.D{{
@@ -101,19 +101,18 @@ func (r *leaveRequestRepository) FindAll() ([]models.LeaveRequestWithUser, error
 	if err = cursor.All(ctx, &requests); err != nil {
 		return nil, fmt.Errorf("gagal mendecode pengajuan dengan detail user: %w", err)
 	}
-    
-    // <--- BARIS LOG DEBUG BARU
-    // Cetak hanya item pertama untuk menghindari log terlalu panjang jika banyak data
-    if len(requests) > 0 {
-        log.Printf("DEBUG: Hasil FindAll LeaveRequests (item pertama): %+v\n", requests[0])
-    } else {
-        log.Println("DEBUG: FindAll LeaveRequests mengembalikan data kosong.")
-    }
-    // --- AKHIR BARIS LOG DEBUG ---
+
+	// <--- BARIS LOG DEBUG BARU
+	// Cetak hanya item pertama untuk menghindari log terlalu panjang jika banyak data
+	if len(requests) > 0 {
+		log.Printf("DEBUG: Hasil FindAll LeaveRequests (item pertama): %+v\n", requests[0])
+	} else {
+		log.Println("DEBUG: FindAll LeaveRequests mengembalikan data kosong.")
+	}
+	// --- AKHIR BARIS LOG DEBUG ---
 
 	return requests, nil
 }
-
 
 func (r *leaveRequestRepository) FindByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.LeaveRequest, error) {
 	var requests []models.LeaveRequest
@@ -129,13 +128,12 @@ func (r *leaveRequestRepository) FindByUserID(ctx context.Context, userID primit
 	if err = cursor.All(ctx, &requests); err != nil {
 		return nil, fmt.Errorf("gagal decode hasil pengajuan cuti: %w", err)
 	}
-	
+
 	if len(requests) == 0 {
 		return []models.LeaveRequest{}, nil // Ini akan mengembalikan slice kosong, bukan nil
 	}
 	return requests, nil
 }
-
 
 func (r *leaveRequestRepository) FindByID(id primitive.ObjectID) (*models.LeaveRequest, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -157,9 +155,9 @@ func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, u
 		"user_id":      userID,
 		"request_type": requestType,
 		"$or": []bson.M{
-			{"start_date": date},
-			{"end_date": date},
-			{
+			{"start_date": date}, // Check if start_date is exactly the date
+			{"end_date": date},   // Check if end_date is exactly the date
+			{ // Check if the date is within the range
 				"start_date": bson.M{"$lte": date},
 				"end_date":   bson.M{"$gte": date},
 			},
@@ -176,7 +174,6 @@ func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, u
 	}
 	return &result, nil
 }
-
 
 func (r *leaveRequestRepository) UpdateStatus(id primitive.ObjectID, status string, note string) (*mongo.UpdateResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -215,3 +212,35 @@ func (r *leaveRequestRepository) CountPendingRequests(ctx context.Context) (int6
 	}
 	return count, nil
 }
+
+// --- BARU: Implementasi CountByUserIDMonthAndType ---
+func (r *leaveRequestRepository) CountByUserIDMonthAndType(ctx context.Context, userID primitive.ObjectID, year int, month time.Month, requestType string) (int64, error) {
+	// Dapatkan tanggal awal bulan yang diminta (tanggal 1 pada jam 00:00:00 UTC)
+	startDateOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	// Dapatkan tanggal akhir bulan yang diminta (hari terakhir bulan, jam 23:59:59.999... UTC)
+	endDateOfMonth := startDateOfMonth.AddDate(0, 1, 0).Add(-time.Nanosecond)
+
+	// Filter untuk mencari pengajuan dengan:
+	// - User ID yang cocok
+	// - Tipe pengajuan yang cocok (misal "Cuti")
+	// - Yang tanggal mulai atau tanggal akhirnya berada dalam rentang bulan yang ditentukan
+	//   Atau yang mencakup bulan tersebut (mulai sebelum/pada akhir bulan, selesai setelah/pada awal bulan)
+	filter := bson.M{
+		"user_id":      userID,
+		"request_type": requestType,
+		"$or": []bson.M{
+			// Kasus 1: Pengajuan dimulai dan berakhir di dalam bulan
+			{"start_date": bson.M{"$gte": startDateOfMonth.Format("2006-01-02"), "$lte": endDateOfMonth.Format("2006-01-02")}},
+			{"end_date": bson.M{"$gte": startDateOfMonth.Format("2006-01-02"), "$lte": endDateOfMonth.Format("2006-01-02")}},
+			// Kasus 2: Pengajuan melintasi seluruh bulan (mulai sebelum, berakhir setelah)
+			{"start_date": bson.M{"$lte": startDateOfMonth.Format("2006-01-02")}, "end_date": bson.M{"$gte": endDateOfMonth.Format("2006-01-02")}},
+		},
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("gagal menghitung pengajuan berdasarkan user, bulan, dan tipe: %w", err)
+	}
+	return count, nil
+}
+// --- AKHIR IMPLEMENTASI BARU ---

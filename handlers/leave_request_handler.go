@@ -50,18 +50,43 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 
 	// Ambil data form
 	requestType := c.FormValue("request_type")
-	startDate := c.FormValue("start_date")
+	startDateStr := c.FormValue("start_date")
 	endDate := c.FormValue("end_date")
 	reason := c.FormValue("reason")
 
-	if requestType == "" || startDate == "" || endDate == "" || reason == "" {
+	if requestType == "" || startDateStr == "" || endDate == "" || reason == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Jenis pengajuan, tanggal mulai, tanggal selesai, dan alasan wajib diisi.",
 		})
 	}
 
-	// ❗ Validasi duplikasi pengajuan (hanya untuk tanggal mulai)
-	existingRequest, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, startDate, requestType)
+	// Parsing startDate untuk mendapatkan bulan dan tahun
+	parsedStartDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format tanggal mulai tidak valid. Gunakan YYYY-MM-DD."})
+	}
+
+	// --- PENYESUAIAN VALIDASI MAKSIMAL 1 KALI PER BULAN HANYA UNTUK 'CUTI' ---
+	if requestType == "Cuti" { // Hanya lakukan validasi ini jika jenis pengajuan adalah "Cuti"
+		currentMonth := parsedStartDate.Month()
+		currentYear := parsedStartDate.Year()
+
+		existingCount, err := h.leaveRepo.CountByUserIDMonthAndType(c.Context(), claims.UserID, currentYear, currentMonth, requestType)
+		if err != nil {
+			log.Printf("ERROR: Gagal memeriksa jumlah pengajuan Cuti untuk user %s di bulan %s %d: %v", claims.UserID.Hex(), currentMonth, currentYear, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti."})
+		}
+
+		if existingCount > 0 { // Jika sudah ada satu atau lebih pengajuan Cuti di bulan ini
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": fmt.Sprintf("Anda hanya dapat mengajukan 'Cuti' satu kali dalam bulan %s %d.", currentMonth.String(), currentYear),
+			})
+		}
+	}
+	// --- AKHIR PENYESUAIAN ---
+
+	// ❗ Validasi duplikasi pengajuan (hanya untuk tanggal mulai) - Ini memastikan tidak ada pengajuan "Cuti" di hari yang sama, dan berlaku juga untuk "Sakit" dan "Izin"
+	existingRequest, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, startDateStr, requestType)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal memeriksa pengajuan sebelumnya",
@@ -69,7 +94,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	}
 	if existingRequest != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": fmt.Sprintf("Anda sudah mengajukan %s untuk tanggal %s. Hanya satu pengajuan per hari diperbolehkan.", requestType, startDate),
+			"error": fmt.Sprintf("Anda sudah mengajukan %s untuk tanggal %s. Hanya satu pengajuan per jenis per hari diperbolehkan.", requestType, startDateStr),
 		})
 	}
 
@@ -96,7 +121,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung"})
 		}
 
-		if requestType == "Sakit" && ext != ".pdf" {
+		if requestType == "Sakit" && ext != ".pdf" { // Rule bisnis: Sakit wajib PDF
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan Sakit harus berupa file PDF"})
 		}
 
@@ -125,6 +150,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 
 		attachmentURL = fmt.Sprintf("/api/v1/files/%s", uploadStream.FileID.(primitive.ObjectID).Hex())
 	} else if requestType == "Sakit" {
+		// Jika ini pengajuan Sakit dan tidak ada file diupload
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Lampiran wajib untuk pengajuan Sakit"})
 	}
 
@@ -132,7 +158,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	newRequest := &models.LeaveRequest{
 		ID:            primitive.NewObjectID(),
 		UserID:        claims.UserID,
-		StartDate:     startDate,
+		StartDate:     startDateStr,
 		EndDate:       endDate,
 		Reason:        reason,
 		Status:        "pending",

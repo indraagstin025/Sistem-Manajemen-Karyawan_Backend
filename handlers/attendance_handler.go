@@ -5,11 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"time"
-	
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	qrcode "github.com/skip2/go-qrcode"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"Sistem-Manajemen-Karyawan/models"
@@ -196,6 +196,90 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 		"qr_code_image": "data:image/png;base64," + encodedString,
 		"expires_at":    expiresAt,
 		"qr_code_value": uniqueCode,
+	})
+}
+
+
+// Di attendance_handler.go
+
+// GetAttendanceHistoryForAdmin godoc
+// @Summary Get Attendance History for All Employees (Admin)
+// @Description Mengambil riwayat kehadiran semua karyawan dengan filter dan pagination (admin only)
+// @Tags Admin Attendance
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 10, max: 100)"
+// @Param user_id query string false "Filter by User ID"
+// @Param start_date query string false "Filter by Start Date (YYYY-MM-DD)"
+// @Param end_date query string false "Filter by End Date (YYYY-MM-DD)"
+// @Success 200 {object} object{data=array,total=int,page=int,limit=int} "Riwayat kehadiran berhasil diambil"
+// @Failure 400 {object} object{error=string} "Invalid parameters"
+// @Failure 401 {object} object{error=string} "Unauthorized"
+// @Failure 403 {object} object{error=string} "Forbidden"
+// @Failure 500 {object} object{error=string} "Internal server error"
+// @Router /admin/attendance/history [get]
+func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*models.Claims)
+	if !ok || claims.Role != "admin" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Akses ditolak. Hanya admin."})
+	}
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	userIDParam := c.Query("user_id", "")
+	startDateStr := c.Query("start_date", "")
+	endDateStr := c.Query("end_date", "")
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	filter := bson.M{}
+	if userIDParam != "" {
+		objID, err := primitive.ObjectIDFromHex(userIDParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format User ID tidak valid."})
+		}
+		filter["user_id"] = objID
+	}
+
+	// Parsing tanggal untuk filter
+	if startDateStr != "" && endDateStr != "" {
+		// Asumsi tanggal disimpan dalam format "YYYY-MM-DD" di DB
+		// Pastikan tanggal yang masuk juga dalam format ini
+		filter["date"] = bson.M{
+			"$gte": startDateStr,
+			"$lte": endDateStr,
+		}
+	} else if startDateStr != "" {
+		filter["date"] = bson.M{"$gte": startDateStr}
+	} else if endDateStr != "" {
+		filter["date"] = bson.M{"$lte": endDateStr}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
+	defer cancel()
+
+	// Anda perlu menambahkan method ini di AttendanceRepository Anda
+	attendances, total, err := h.repo.GetAllAttendancesWithUserDetails(ctx, filter, int64(page), int64(limit))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil riwayat kehadiran: " + err.Error()})
+	}
+
+	if attendances == nil {
+		attendances = []models.AttendanceWithUser{}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data":  attendances,
+		"total": total,
+		"page":  page,
+		"limit": limit,
 	})
 }
 

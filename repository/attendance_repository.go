@@ -31,6 +31,7 @@ type AttendanceRepository interface {
 	GetTodayAttendanceWithUserDetails(ctx context.Context) ([]models.AttendanceWithUser, error)
 	FindAttendanceByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.Attendance, error)
     UpdateAttendance(ctx context.Context, id primitive.ObjectID, payload *models.AttendanceUpdatePayload) (*mongo.UpdateResult, error)
+	GetAllAttendancesWithUserDetails(ctx context.Context, filter bson.M, page, limit int64) ([]models.AttendanceWithUser, int64, error)
 }
 
 
@@ -92,6 +93,80 @@ func (r *attendanceRepository) FindActiveQRCodeByDate(ctx context.Context, date 
 	}
 	return &qrCode, nil
 }
+
+// attendance/repository/attendance_repository.go
+
+// ... (kode yang sudah ada sebelumnya) ...
+
+// Implementasi metode baru
+func (r *attendanceRepository) GetAllAttendancesWithUserDetails(ctx context.Context, filter bson.M, page, limit int64) ([]models.AttendanceWithUser, int64, error) {
+	// Hitung total dokumen yang cocok dengan filter untuk pagination
+	total, err := r.attendanceCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("gagal menghitung total dokumen absensi: %w", err)
+	}
+
+	// Atur opsi untuk pagination
+	findOptions := options.Find()
+	findOptions.SetSkip((page - 1) * limit)
+	findOptions.SetLimit(limit)
+	findOptions.SetSort(bson.D{{Key: "date", Value: -1}, {Key: "check_in", Value: -1}}) // Urutkan berdasarkan tanggal terbaru, lalu check-in
+
+	// Pipeline agregasi untuk menggabungkan data absensi dengan detail user
+	pipeline := mongo.Pipeline{
+		// Tahap $match untuk filter yang diberikan
+		{{Key: "$match", Value: filter}},
+		// Tahap $sort untuk sorting (opsional, bisa juga di FindOptions)
+		{{Key: "$sort", Value: bson.D{{Key: "date", Value: -1}, {Key: "check_in", Value: -1}}}},
+		// Tahap $skip untuk pagination
+		{{Key: "$skip", Value: (page - 1) * limit}},
+		// Tahap $limit untuk pagination
+		{{Key: "$limit", Value: limit}},
+		// Tahap $lookup untuk menggabungkan dengan koleksi users
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: config.UserCollection},
+			{Key: "localField", Value: "user_id"},
+			{Key: "foreignField", Value: "_id"},
+			{Key: "as", Value: "userDetails"},
+		}}},
+		// Tahap $unwind untuk mengeluarkan array userDetails menjadi objek tunggal
+		{{Key: "$unwind", Value: "$userDetails"}},
+		// Tahap $project untuk memilih dan membentuk ulang field yang ingin ditampilkan
+		{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: "$_id"},
+			{Key: "id", Value: "$_id"}, // Memberikan ID sebagai string
+			{Key: "user_id", Value: 1},
+			{Key: "date", Value: 1},
+			{Key: "check_in", Value: 1},
+			{Key: "check_out", Value: 1},
+			{Key: "status", Value: 1},
+			{Key: "note", Value: 1},
+			{Key: "user_name", Value: "$userDetails.name"},
+			{Key: "user_email", Value: "$userDetails.email"},
+			{Key: "user_photo", Value: "$userDetails.photo"},        // Asumsi 'photo' menyimpan URL atau ID foto
+			{Key: "user_position", Value: "$userDetails.position"},
+			{Key: "user_department", Value: "$userDetails.department"},
+		}}},
+	}
+
+	cursor, err := r.attendanceCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, 0, fmt.Errorf("gagal aggregation untuk riwayat kehadiran admin: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var results []models.AttendanceWithUser
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, 0, fmt.Errorf("gagal decode hasil aggregation riwayat kehadiran: %w", err)
+	}
+
+	if len(results) == 0 {
+		return []models.AttendanceWithUser{}, total, nil // Pastikan mengembalikan slice kosong dan total
+	}
+	return results, total, nil
+}
+
+// ... (sisa kode attendanceRepository lainnya) ...
 
 func (r *attendanceRepository) MarkQRCodeAsUsed(ctx context.Context, qrCodeID primitive.ObjectID, userID primitive.ObjectID) (*mongo.UpdateResult, error) {
 	filter := bson.M{"_id": qrCodeID}
