@@ -106,12 +106,17 @@ func SetupRoutes(app *fiber.App) {
 	workScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
 
 	// Rute KHUSUS ADMIN untuk MENGELOLA (Create, Update, Delete) aturan jadwal
-	// Perhatikan: GET /:id juga harus dilindungi admin jika hanya admin yang boleh melihat detail aturan
 	workScheduleGroup.Post("/", middleware.AdminMiddleware(), workScheduleHandler.CreateWorkSchedule)
 	workScheduleGroup.Put("/:id", middleware.AdminMiddleware(), workScheduleHandler.UpdateWorkSchedule)
 	workScheduleGroup.Delete("/:id", middleware.AdminMiddleware(), workScheduleHandler.DeleteWorkSchedule)
-	// --- MENAMBAHKAN RUTE BARU UNTUK MENGAMBIL DETAIL SATU ATURAN JADWAL ---
-	workScheduleGroup.Get("/:id", middleware.AdminMiddleware(), workScheduleHandler.GetWorkScheduleById) // <-- Rute ini ditambahkan
+	workScheduleGroup.Get("/:id", middleware.AdminMiddleware(), workScheduleHandler.GetWorkScheduleById) 
+    
+    // ======================================================
+    // RUTE HARI LIBUR - INI YANG HILANG DAN PERLU DITAMBAHKAN!
+    // ======================================================
+    // Rute untuk mendapatkan daftar hari libur. Diproteksi dengan AuthMiddleware.
+    api.Get("/holidays", middleware.AuthMiddleware(), workScheduleHandler.GetHolidays) // <--- TAMBAHKAN BARIS INI!
+
 
 	log.Println("Semua rute aplikasi berhasil didaftarkan.")
 
@@ -161,6 +166,8 @@ func SetupRoutes(app *fiber.App) {
 	log.Println("- POST /api/v1/work-schedules (admin only)")         // Membuat aturan jadwal kerja (admin only)
 	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")      // Memperbarui aturan jadwal kerja (admin only)
 	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)")   // Menghapus aturan jadwal kerja (admin only)
+    log.Println("- GET /api/v1/holidays (protected)")                 // Mendapatkan daftar hari libur (semua terautentikasi)
+
 
 	log.Println("Swagger documentation tersedia di: /docs/index.html")
 }
