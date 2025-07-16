@@ -26,6 +26,7 @@ type LeaveRequestRepository interface {
 	FindByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.LeaveRequest, error)
 	FindByUserAndDateAndType(ctx context.Context, userID primitive.ObjectID, date string, requestType string) (*models.LeaveRequest, error)
 	CountByUserIDMonthAndType(ctx context.Context, userID primitive.ObjectID, year int, month time.Month, requestType string) (int64, error)
+	 FindApprovedRequestByUserAndDate(ctx context.Context, userID primitive.ObjectID, date string) (*models.LeaveRequest, error)
 }
 
 type leaveRequestRepository struct {
@@ -168,6 +169,8 @@ func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, u
 	return &result, nil
 }
 
+
+
 func (r *leaveRequestRepository) UpdateStatus(id primitive.ObjectID, status string, note string) (*mongo.UpdateResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -228,4 +231,28 @@ func (r *leaveRequestRepository) CountByUserIDMonthAndType(ctx context.Context, 
 		return 0, fmt.Errorf("gagal menghitung pengajuan berdasarkan user, bulan, dan tipe: %w", err)
 	}
 	return count, nil
+}
+
+func (r *leaveRequestRepository) FindApprovedRequestByUserAndDate(ctx context.Context, userID primitive.ObjectID, date string) (*models.LeaveRequest, error) {
+	var request models.LeaveRequest
+    
+    // Filter ini akan mencari dokumen di mana 'date' berada di antara
+    // 'start_date' dan 'end_date' (inklusif) dan statusnya "approved".
+	filter := bson.M{
+		"user_id":    userID,
+		"status":     "approved",
+		"start_date": bson.M{"$lte": date},
+		"end_date":   bson.M{"$gte": date},
+	}
+
+	err := r.collection.FindOne(ctx, filter).Decode(&request)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			// Tidak ditemukan itu bukan error, artinya user tidak sedang cuti/sakit.
+			return nil, nil
+		}
+		return nil, fmt.Errorf("gagal mencari pengajuan yang disetujui: %w", err)
+	}
+    
+	return &request, nil
 }

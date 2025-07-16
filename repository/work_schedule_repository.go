@@ -3,10 +3,14 @@ package repository
 import (
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
+	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/teambition/rrule-go"
+	"github.com/valyala/fasthttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -14,6 +18,10 @@ import (
 
 type WorkScheduleRepository struct {
 	Collection *mongo.Collection
+}
+
+func (r *WorkScheduleRepository) FindUserScheduleForDate(ctx *fasthttp.RequestCtx, userID primitive.ObjectID, today string) (any, error) {
+	panic("unimplemented")
 }
 
 func NewWorkScheduleRepository() *WorkScheduleRepository {
@@ -137,6 +145,53 @@ func (r *WorkScheduleRepository) FindByID(id primitive.ObjectID) (*models.WorkSc
 	return &result, nil
 }
 
+func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Context, userID primitive.ObjectID, date string) (*models.WorkSchedule, error) {
+	targetDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, fmt.Errorf("format tanggal tidak valid: %s", date)
+	}
+
+	// Panggil fungsi dari package utils
+	holidayMap, err := util.GetHolidayMap(targetDate.Format("2006")) // <-- DIUBAH
+	if err != nil {
+		fmt.Printf("Peringatan: Gagal mengambil data hari libur: %v\n", err)
+	}
+	if holidayMap != nil && holidayMap[date] {
+		return nil, errors.New("jadwal tidak ditemukan (hari libur)")
+	}
+
+	filter := bson.M{}
+	allScheduleRules, err := r.FindAllWithFilter(filter)
+	if err != nil {
+		return nil, fmt.Errorf("gagal mengambil aturan jadwal: %w", err)
+	}
+
+	for _, rule := range allScheduleRules {
+		if rule.RecurrenceRule == "" {
+			if rule.Date == date {
+				return &rule, nil
+			}
+		} else {
+			rOption, err := rrule.StrToROption(rule.RecurrenceRule)
+			if err != nil {
+				continue
+			}
+			ruleStartDate, _ := time.Parse("2006-01-02", rule.Date)
+			rOption.Dtstart = ruleStartDate
+			rr, err := rrule.NewRRule(*rOption)
+			if err != nil {
+				continue
+			}
+			if len(rr.Between(targetDate, targetDate, true)) > 0 {
+				instanceSchedule := rule
+				instanceSchedule.Date = date
+				return &instanceSchedule, nil
+			}
+		}
+	}
+
+	return nil, errors.New("jadwal tidak ditemukan")
+}
 
 func (r *WorkScheduleRepository) FindByUserAndDateRange(userID primitive.ObjectID, startDate, endDate string) ([]*models.WorkSchedule, error) {
 	filter := bson.M{

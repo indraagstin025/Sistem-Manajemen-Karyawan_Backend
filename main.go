@@ -1,16 +1,20 @@
 package main
 
 import (
+	"Sistem-Manajemen-Karyawan/config"
+	"Sistem-Manajemen-Karyawan/repository" // BARU: import repository
+	"Sistem-Manajemen-Karyawan/router"
+	"context" // BARU: import context
+	
 	"log"
+
+	_ "Sistem-Manajemen-Karyawan/docs"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
-
-	"Sistem-Manajemen-Karyawan/config"
-	"Sistem-Manajemen-Karyawan/router"
-	_ "Sistem-Manajemen-Karyawan/docs" 
-	_ "time/tzdata" 
+	"github.com/robfig/cron/v3" // BARU: import library cron
+	_ "time/tzdata"
 )
 
 // @title Sistem Manajemen Karyawan API
@@ -52,32 +56,59 @@ import (
 // @tag.name Leave Request
 // @tag.description Leave request management endpoints
 func main() {
-
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Warning: .env file tidak ditemukan, menggunakan environment variables sistem")
+		log.Println("Warning: .env file tidak ditemukan...")
 	}
 
-	cfg := config.LoadConfig() 
-
+	cfg := config.LoadConfig()
 	config.MongoConnect()
-	config.InitDatabase() 
-
+	config.InitDatabase()
 	defer config.DisconnectDB()
 
+	// =======================================================
+	// Inisialisasi Repositories (Dibuat Sekali)
+	// =======================================================
+	log.Println("Menginisialisasi semua repositories...")
+	userRepo := repository.NewUserRepository()
+	attendanceRepo := repository.NewAttendanceRepository()
+	workScheduleRepo := repository.NewWorkScheduleRepository()
+	leaveRequestRepo := repository.NewLeaveRequestRepository()
+	deptRepo := repository.NewDepartmentRepository() // <-- BARU: Tambahkan inisialisasi ini
+
+	// =======================================================
+	// Penyiapan Cron Job
+	// =======================================================
+	c := cron.New()
+	_, err = c.AddFunc("0 17-22 * * *", func() {
+		err := attendanceRepo.MarkAbsentEmployeesAsAlpha(
+			context.Background(),
+			userRepo,
+			workScheduleRepo,
+			leaveRequestRepo,
+		)
+		if err != nil {
+			log.Println("❌ Error saat menjalankan cron job Alpha:", err)
+		}
+	})
+	if err != nil {
+		log.Fatal("Gagal menambahkan cron job:", err)
+	}
+	c.Start()
+	log.Println("✅ Scheduler untuk status Alpha otomatis telah dimulai.")
+
+	// =======================================================
+	// Setup Fiber App
+	// =======================================================
 	app := fiber.New()
-
-	
-	config.SetupCORS(app) 
-
+	config.SetupCORS(app)
 	app.Use(logger.New())
 
-	router.SetupRoutes(app) 
+	// DIUBAH: Oper instance deptRepo juga ke SetupRoutes
+	router.SetupRoutes(app, userRepo, deptRepo, attendanceRepo, leaveRequestRepo, workScheduleRepo)
 
 	log.Printf("Server running on port %s", cfg.Port)
-	log.Printf("API Documentation: http://localhost:%s/docs/index.html", cfg.Port)
-	log.Printf("Health Check: http://localhost:%s/", cfg.Port)
-	log.Printf("CORS enabled for origins: %v", config.GetAllowedOrigins()) 
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
+
 

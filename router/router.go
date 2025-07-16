@@ -13,17 +13,17 @@ import (
 	_ "Sistem-Manajemen-Karyawan/docs"
 )
 
-func SetupRoutes(app *fiber.App) {
+func SetupRoutes(
+	app *fiber.App,
+	userRepo *repository.UserRepository,                 // Ini adalah pointer ke struct, jadi (*) sudah benar
+	deptRepo repository.DepartmentRepository,             // Ini adalah interface, JANGAN pakai (*)
+	attendanceRepo repository.AttendanceRepository,         // Ini adalah interface, JANGAN pakai (*)
+	leaveRepo repository.LeaveRequestRepository,            // Ini adalah interface, JANGAN pakai (*)
+	workScheduleRepo *repository.WorkScheduleRepository, // Ini adalah pointer ke struct, jadi (*) sudah benar
+) {
 	log.Println("Memulai pendaftaran rute aplikasi...")
 
-	// Inisialisasi Repositories
-	userRepo := repository.NewUserRepository()
-	deptRepo := repository.NewDepartmentRepository()
-	attendanceRepo := repository.NewAttendanceRepository()
-	leaveRepo := repository.NewLeaveRequestRepository()
-	workScheduleRepo := repository.NewWorkScheduleRepository()
-
-	// Inisialisasi Handlers
+	// Inisialisasi Handlers (tidak ada perubahan di sini)
 	authHandler := handlers.NewAuthHandler(userRepo)
 	userHandler := handlers.NewUserHandler(userRepo, deptRepo, leaveRepo)
 	deptHandler := handlers.NewDepartmentHandler(deptRepo)

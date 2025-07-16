@@ -49,69 +49,78 @@ func NewAttendanceHandler(repo repository.AttendanceRepository, workScheduleRepo
 
 // handlers/attendance_handler.go
 
+// file: handlers/attendance_handler.go
+
 func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	var payload models.QRCodeScanPayload
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid: " + err.Error()})
 	}
-	
-	wib, _ := time.LoadLocation("Asia/Jakarta")
-	today := time.Now().In(wib).Format("2006-01-02")
 
+	wib, _ := time.LoadLocation("Asia/Jakarta")
+	now := time.Now().In(wib)
+	today := now.Format("2006-01-02")
+
+	// 1. Validasi QR Code
 	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
-	if err != nil || qrCode == nil || qrCode.Date != today || time.Now().In(wib).After(qrCode.ExpiresAt) {
+	if err != nil || qrCode == nil || qrCode.Date != today || now.After(qrCode.ExpiresAt) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code tidak valid atau sudah kadaluarsa."})
 	}
-	
-	userID, _ := primitive.ObjectIDFromHex(payload.UserID)
+
+	userID, err := primitive.ObjectIDFromHex(payload.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format User ID tidak valid."})
+	}
+
+	// 2. Cek duplikasi absensi
 	existingAttendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
 	if err == nil && existingAttendance != nil {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Anda sudah melakukan check-in hari ini."})
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": fmt.Sprintf("Anda sudah memiliki record absensi untuk hari ini dengan status: %s.", existingAttendance.Status)})
 	}
-	
-	schedule, err := h.workScheduleRepo.FindByDate(today)
-	if err != nil || len(schedule) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Tidak ada jadwal kerja yang aktif untuk hari ini.",
-		})
-	}
-	todaysSchedule := schedule[0]
 
-	currentTimeInWIB := time.Now().In(wib)
+	// 3. Panggil fungsi repository. Sekarang tipenya sudah benar.
+	todaysSchedule, err := h.workScheduleRepo.FindApplicableScheduleForUser(c.Context(), userID, today)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+    // -- BARIS TYPE ASSERTION YANG KEMARIN KITA TAMBAHKAN, SEKARANG DIHAPUS --
+
+	// 4. Logika perbandingan waktu
 	scheduledStartTime, _ := time.ParseInLocation("15:04", todaysSchedule.StartTime, wib)
-	
-	scheduledCheckInTime := time.Date(
-		currentTimeInWIB.Year(), currentTimeInWIB.Month(), currentTimeInWIB.Day(),
+	scheduleCheckInTime := time.Date(
+		now.Year(), now.Month(), now.Day(),
 		scheduledStartTime.Hour(), scheduledStartTime.Minute(), 0, 0, wib,
 	)
 
-	gracePeriod := 15 * time.Minute
-	latestCheckInTime := scheduledCheckInTime.Add(gracePeriod)
-	
+	gracePeriod := 30 * time.Minute
+	latestCheckInTime := scheduleCheckInTime.Add(gracePeriod)
+
 	var attendanceStatus string
-	if currentTimeInWIB.After(latestCheckInTime) {
+	if now.After(latestCheckInTime) {
 		attendanceStatus = "Terlambat"
 	} else {
-		attendanceStatus = "Tepat Waktu"
+		attendanceStatus = "Hadir"
 	}
 
-newAttendance := models.Attendance{
-	ID:        primitive.NewObjectID(),
-	UserID:    userID,
-	Date:      today,
-	CheckIn:   currentTimeInWIB.Format("15:04"),
-	Status:    attendanceStatus,
-	CreatedAt: currentTimeInWIB,
-	UpdatedAt: currentTimeInWIB,
-}
+	// 5. Membuat record absensi baru
+	newAttendance := models.Attendance{
+		ID:        primitive.NewObjectID(),
+		UserID:    userID,
+		Date:      today,
+		CheckIn:   now.Format("15:04"),
+		Status:    attendanceStatus,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
 
 	_, err = h.repo.CreateAttendance(c.Context(), &newAttendance)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan check-in: " + err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menyimpan data check-in: " + err.Error()})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": fmt.Sprintf("Berhasil check-in pukul %s. Status: %s", newAttendance.CheckIn, newAttendance.Status),
+		"message": fmt.Sprintf("Berhasil check-in pukul %s. Status Anda: %s", newAttendance.CheckIn, newAttendance.Status),
 	})
 }
 

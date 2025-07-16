@@ -32,6 +32,12 @@ type AttendanceRepository interface {
 	FindAttendanceByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.Attendance, error)
     UpdateAttendance(ctx context.Context, id primitive.ObjectID, payload *models.AttendanceUpdatePayload) (*mongo.UpdateResult, error)
 	GetAllAttendancesWithUserDetails(ctx context.Context, filter bson.M, page, limit int64) ([]models.AttendanceWithUser, int64, error)
+MarkAbsentEmployeesAsAlpha(
+        ctx context.Context,
+        userRepo *UserRepository, // <--- TAMBAHKAN *
+        workScheduleRepo *WorkScheduleRepository, // <--- TAMBAHKAN *
+        leaveRequestRepo LeaveRequestRepository, // Tipe ini sudah benar karena menggunakan interface
+    ) error
 }
 
 
@@ -91,6 +97,7 @@ func (r *attendanceRepository) FindActiveQRCodeByDate(ctx context.Context, date 
 	}
 	return &qrCode, nil
 }
+
 
 
 
@@ -294,4 +301,89 @@ func (r *attendanceRepository) UpdateAttendance(ctx context.Context, id primitiv
 		return nil, err
 	}
 	return res, nil
+}
+
+// file: repository/attendance_repository.go
+// (Tambahkan di bagian bawah file)
+
+// MarkAbsentEmployeesAsAlpha adalah fungsi yang akan dijalankan oleh cron job.
+// Ia membutuhkan repository lain sebagai argumen untuk melakukan tugasnya.
+// file: repository/attendance_repository.go
+
+func (r *attendanceRepository) MarkAbsentEmployeesAsAlpha(
+    ctx context.Context,
+    userRepo *UserRepository,
+    workScheduleRepo *WorkScheduleRepository,
+    leaveRequestRepo LeaveRequestRepository,
+) error {
+    fmt.Println("🚀 [Cron Job] Memulai tugas: Menandai karyawan Alpha...")
+    now := time.Now()
+    today := now.Format("2006-01-02")
+
+    activeUsers, err := userRepo.FindAllActiveUsers(ctx)
+    if err != nil {
+        fmt.Printf("❌ [Cron Job] Error mendapatkan user aktif: %v\n", err)
+        return err
+    }
+
+    alphaCount := 0
+    for _, user := range activeUsers {
+        if user.Role == "admin" {
+            continue
+        }
+
+        schedule, _ := workScheduleRepo.FindApplicableScheduleForUser(ctx, user.ID, today)
+        if schedule == nil {
+            continue 
+        }
+
+        // =======================================================
+        // BARU: Cek apakah jam sekarang sudah melewati jam pulang
+        // =======================================================
+        wib, _ := time.LoadLocation("Asia/Jakarta")
+        scheduleEndTime, err := time.ParseInLocation("15:04", schedule.EndTime, wib)
+        if err != nil {
+            continue // Lewati jika format EndTime salah
+        }
+
+        // Buat waktu EndTime hari ini secara lengkap
+        fullScheduleEndTime := time.Date(now.Year(), now.Month(), now.Day(), scheduleEndTime.Hour(), scheduleEndTime.Minute(), 0, 0, wib)
+
+        // Jika jam sekarang BELUM melewati jam pulang, jangan proses dulu
+        if now.Before(fullScheduleEndTime) {
+            continue
+        }
+        // =======================================================
+
+        attendance, _ := r.FindAttendanceByUserAndDate(ctx, user.ID, today)
+        if attendance != nil {
+            continue
+        }
+
+        leave, _ := leaveRequestRepo.FindApprovedRequestByUserAndDate(ctx, user.ID, today)
+        if leave != nil {
+            continue
+        }
+
+        fmt.Printf("✔️ [Cron Job] Menandai user %s sebagai Alpha...\n", user.Name)
+        alphaAttendance := &models.Attendance{
+            ID:        primitive.NewObjectID(),
+            UserID:    user.ID,
+            Date:      today,
+            Status:    "Alpha",
+            Note:      "Dibuat otomatis oleh sistem (setelah jam kerja)",
+            CreatedAt: time.Now(),
+            UpdatedAt: time.Now(),
+        }
+
+        _, createErr := r.CreateAttendance(ctx, alphaAttendance)
+        if createErr != nil {
+            fmt.Printf("❌ [Cron Job] Gagal menyimpan data Alpha untuk user %s: %v\n", user.ID.Hex(), createErr)
+        } else {
+            alphaCount++
+        }
+    }
+
+    fmt.Printf("✅ [Cron Job] Selesai. %d karyawan ditandai sebagai Alpha.\n", alphaCount)
+    return nil
 }
