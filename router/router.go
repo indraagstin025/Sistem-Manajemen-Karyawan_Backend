@@ -163,12 +163,12 @@ func SetupRoutes(app *fiber.App) {
 	log.Println("- GET /api/v1/admin/leave-requests (admin only)")
 	log.Println("- PUT /api/v1/admin/leave-requests/:id/status (admin only)")
 
-	log.Println("- GET /api/v1/work-schedules (protected)")           // Melihat jadwal kerja (semua terautentikasi)
-	log.Println("- GET /api/v1/work-schedules/:id (admin only)")      // Melihat detail aturan jadwal kerja (admin only)
-	log.Println("- POST /api/v1/work-schedules (admin only)")         // Membuat aturan jadwal kerja (admin only)
-	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")      // Memperbarui aturan jadwal kerja (admin only)
-	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)")   // Menghapus aturan jadwal kerja (admin only)
-    log.Println("- GET /api/v1/holidays (protected)")                 // Mendapatkan daftar hari libur (semua terautentikasi)
+	log.Println("- GET /api/v1/work-schedules (protected)")           
+	log.Println("- GET /api/v1/work-schedules/:id (admin only)")      
+	log.Println("- POST /api/v1/work-schedules (admin only)")         
+	log.Println("- PUT /api/v1/work-schedules/:id (admin only)")      
+	log.Println("- DELETE /api/v1/work-schedules/:id (admin only)")   
+    log.Println("- GET /api/v1/holidays (protected)")                 
 
 
 	log.Println("Swagger documentation tersedia di: /docs/index.html")

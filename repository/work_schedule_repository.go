@@ -130,10 +130,8 @@ func (r *WorkScheduleRepository) FindByID(id primitive.ObjectID) (*models.WorkSc
 	err := r.Collection.FindOne(context.TODO(), filter).Decode(&result)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			// Mengembalikan error spesifik jika dokumen tidak ditemukan
 			return nil, errors.New("jadwal tidak ditemukan")
 		}
-		// Mengembalikan error lain jika ada masalah teknis
 		return nil, err
 	}
 	return &result, nil

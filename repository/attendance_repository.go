@@ -16,7 +16,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// AttendanceRepository mendefinisikan interface untuk operasi database terkait kehadiran dan QR Code.
+
 type AttendanceRepository interface {
 	// --- Methods for QRCode ---
 	CreateQRCode(ctx context.Context, qrCode *models.QRCode) (*mongo.InsertOneResult, error)
@@ -42,7 +42,6 @@ type attendanceRepository struct {
 	userCollection       *mongo.Collection
 }
 
-// NewAttendanceRepository menginisialisasi repository kehadiran.
 func NewAttendanceRepository() AttendanceRepository {
 	return &attendanceRepository{
 		qrCodeCollection:     config.GetCollection(config.QRCodeCollection),
@@ -51,7 +50,6 @@ func NewAttendanceRepository() AttendanceRepository {
 	}
 }
 
-// --- Implementasi untuk model.QRCode ---
 
 func (r *attendanceRepository) CreateQRCode(ctx context.Context, qrCode *models.QRCode) (*mongo.InsertOneResult, error) {
 	res, err := r.qrCodeCollection.InsertOne(ctx, qrCode)
@@ -87,54 +85,46 @@ func (r *attendanceRepository) FindActiveQRCodeByDate(ctx context.Context, date 
 	err := r.qrCodeCollection.FindOne(ctx, filter, opts).Decode(&qrCode)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil // Return nil, nil jika tidak ditemukan
+			return nil, nil 
 		}
 		return nil, fmt.Errorf("gagal mencari QR Code aktif: %w", err)
 	}
 	return &qrCode, nil
 }
 
-// attendance/repository/attendance_repository.go
 
-// ... (kode yang sudah ada sebelumnya) ...
 
-// Implementasi metode baru
 func (r *attendanceRepository) GetAllAttendancesWithUserDetails(ctx context.Context, filter bson.M, page, limit int64) ([]models.AttendanceWithUser, int64, error) {
-	// Hitung total dokumen yang cocok dengan filter untuk pagination
+	
 	total, err := r.attendanceCollection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, fmt.Errorf("gagal menghitung total dokumen absensi: %w", err)
 	}
 
-	// Atur opsi untuk pagination
+
 	findOptions := options.Find()
 	findOptions.SetSkip((page - 1) * limit)
 	findOptions.SetLimit(limit)
 	findOptions.SetSort(bson.D{{Key: "date", Value: -1}, {Key: "check_in", Value: -1}}) // Urutkan berdasarkan tanggal terbaru, lalu check-in
 
-	// Pipeline agregasi untuk menggabungkan data absensi dengan detail user
+	
 	pipeline := mongo.Pipeline{
-		// Tahap $match untuk filter yang diberikan
+		
 		{{Key: "$match", Value: filter}},
-		// Tahap $sort untuk sorting (opsional, bisa juga di FindOptions)
 		{{Key: "$sort", Value: bson.D{{Key: "date", Value: -1}, {Key: "check_in", Value: -1}}}},
-		// Tahap $skip untuk pagination
 		{{Key: "$skip", Value: (page - 1) * limit}},
-		// Tahap $limit untuk pagination
 		{{Key: "$limit", Value: limit}},
-		// Tahap $lookup untuk menggabungkan dengan koleksi users
 		{{Key: "$lookup", Value: bson.D{
 			{Key: "from", Value: config.UserCollection},
 			{Key: "localField", Value: "user_id"},
 			{Key: "foreignField", Value: "_id"},
 			{Key: "as", Value: "userDetails"},
 		}}},
-		// Tahap $unwind untuk mengeluarkan array userDetails menjadi objek tunggal
+		
 		{{Key: "$unwind", Value: "$userDetails"}},
-		// Tahap $project untuk memilih dan membentuk ulang field yang ingin ditampilkan
 		{{Key: "$project", Value: bson.D{
 			{Key: "_id", Value: "$_id"},
-			{Key: "id", Value: "$_id"}, // Memberikan ID sebagai string
+			{Key: "id", Value: "$_id"}, 
 			{Key: "user_id", Value: 1},
 			{Key: "date", Value: 1},
 			{Key: "check_in", Value: 1},
@@ -143,7 +133,7 @@ func (r *attendanceRepository) GetAllAttendancesWithUserDetails(ctx context.Cont
 			{Key: "note", Value: 1},
 			{Key: "user_name", Value: "$userDetails.name"},
 			{Key: "user_email", Value: "$userDetails.email"},
-			{Key: "user_photo", Value: "$userDetails.photo"},        // Asumsi 'photo' menyimpan URL atau ID foto
+			{Key: "user_photo", Value: "$userDetails.photo"},        
 			{Key: "user_position", Value: "$userDetails.position"},
 			{Key: "user_department", Value: "$userDetails.department"},
 		}}},
@@ -166,7 +156,6 @@ func (r *attendanceRepository) GetAllAttendancesWithUserDetails(ctx context.Cont
 	return results, total, nil
 }
 
-// ... (sisa kode attendanceRepository lainnya) ...
 
 func (r *attendanceRepository) MarkQRCodeAsUsed(ctx context.Context, qrCodeID primitive.ObjectID, userID primitive.ObjectID) (*mongo.UpdateResult, error) {
 	filter := bson.M{"_id": qrCodeID}
@@ -182,8 +171,6 @@ func (r *attendanceRepository) MarkQRCodeAsUsed(ctx context.Context, qrCodeID pr
 	return res, nil
 }
 
-// --- Implementasi untuk model.Attendance ---
-
 func (r *attendanceRepository) CreateAttendance(ctx context.Context, attendance *models.Attendance) (*mongo.InsertOneResult, error) {
 	res, err := r.attendanceCollection.InsertOne(ctx, attendance)
 	if err != nil {
@@ -198,7 +185,7 @@ func (r *attendanceRepository) FindAttendanceByUserAndDate(ctx context.Context, 
 	err := r.attendanceCollection.FindOne(ctx, filter).Decode(&attendance)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil // Mengembalikan nil, nil jika tidak ditemukan (sudah benar)
+			return nil, nil 
 		}
 		return nil, fmt.Errorf("gagal mencari absensi berdasarkan user dan tanggal: %w", err)
 	}

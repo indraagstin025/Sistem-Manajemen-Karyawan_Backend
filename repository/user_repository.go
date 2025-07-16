@@ -143,9 +143,6 @@ func (r *UserRepository) UpdateUserFirstLoginStatus(ctx context.Context, id prim
 	return nil
 }
 
-
-
-// CountDocuments adalah fungsi umum untuk menghitung dokumen berdasarkan filter
 func (r *UserRepository) CountDocuments(ctx context.Context, filter bson.M) (int64, error) {
     count, err := r.collection.CountDocuments(ctx, filter)
     if err != nil {
@@ -154,7 +151,6 @@ func (r *UserRepository) CountDocuments(ctx context.Context, filter bson.M) (int
     return count, nil
 }
 
-// Aggregate adalah fungsi umum untuk menjalankan pipeline agregasi pada koleksi user
 func (r *UserRepository) Aggregate(ctx context.Context, pipeline mongo.Pipeline) (*mongo.Cursor, error) {
     cursor, err := r.collection.Aggregate(ctx, pipeline)
     if err != nil {

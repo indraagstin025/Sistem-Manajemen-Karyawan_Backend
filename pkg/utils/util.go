@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-// GenerateBase64Key generates a secure 32-byte key and returns it as base64 URL-encoded
 func GenerateBase64Key(size int) (string, error) {
 	if size != 32 {
 		return "", fmt.Errorf("PASETO v2 local requires a 32-byte key")
