@@ -160,7 +160,7 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 
 // UpdateUser godoc
 // @Summary Update User
-// @Description Update data user (user hanya bisa update data diri sendiri, admin bisa update semua)
+// @Description Update data user (user hanya bisa update data diri sendiri, admin bisa update semua, karyawan sekarang bisa mengubah email sendiri)
 // @Tags Users
 // @Accept json
 // @Produce json
@@ -186,6 +186,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
 	}
 
+	// Memeriksa otorisasi: User yang login harus sama dengan user yang diupdate, ATAU user yang login harus admin.
 	if claims.Role != "admin" && claims.UserID.Hex() != idParam {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat mengupdate profil anda sendiri."})
 	}
@@ -200,27 +201,53 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 
 	updateData := bson.M{}
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
 
+	// Logika update berdasarkan peran
 	if claims.Role != "admin" {
+		// Jika user bukan admin (karyawan), hanya izinkan update untuk Photo, Address, dan EMAIL
 		if payload.Photo != "" {
 			updateData["photo"] = payload.Photo
 		}
 		if payload.Address != "" {
 			updateData["address"] = payload.Address
 		}
+		
+		// Izinkan karyawan untuk mengubah email mereka sendiri, dengan validasi keunikan
+		if payload.Email != "" {
+			isEmailTaken, err := h.userRepo.IsEmailTaken(ctx, payload.Email, objID)
+			if err != nil {
+				log.Printf("Error checking email existence: %v", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa ketersediaan email."})
+			}
+			if isEmailTaken {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email sudah digunakan oleh user lain."})
+			}
+			updateData["email"] = payload.Email
+		}
 
-		if payload.Name != "" || payload.Email != "" ||
+		// Batasi perubahan lain untuk non-admin
+		if payload.Name != "" ||
 			payload.Position != "" || payload.Department != "" || payload.BaseSalary != 0 {
-
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "akses ditolak. anda tidak diizinkan mengubah nama, email, posisi, departemen, atau gaji dasar.",
+				"error": "akses ditolak. anda tidak diizinkan mengubah nama, posisi, departemen, atau gaji dasar.",
 			})
 		}
-	} else {
+	} else { // Jika user adalah admin, izinkan update semua bidang
 		if payload.Name != "" {
 			updateData["name"] = payload.Name
 		}
 		if payload.Email != "" {
+			// Admin juga perlu validasi email unik, mengecualikan user yang sedang diupdate
+			isEmailTaken, err := h.userRepo.IsEmailTaken(ctx, payload.Email, objID)
+			if err != nil {
+				log.Printf("Error checking email existence for admin update: %v", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa ketersediaan email saat update admin."})
+			}
+			if isEmailTaken {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email sudah digunakan oleh user lain."})
+			}
 			updateData["email"] = payload.Email
 		}
 		if payload.Position != "" {
@@ -243,9 +270,6 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	if len(updateData) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tidak ada field yang akan diupdate"})
 	}
-
-	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-	defer cancel()
 
 	result, err := h.userRepo.UpdateUser(ctx, objID, updateData)
 	if err != nil {

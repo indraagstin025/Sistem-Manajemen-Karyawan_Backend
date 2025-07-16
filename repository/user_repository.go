@@ -176,3 +176,16 @@ func (r *UserRepository) FindAllActiveUsers(ctx context.Context) ([]models.User,
 
 	return users, nil
 }
+
+func (r *UserRepository) IsEmailTaken(ctx context.Context, email string, excludeUserID primitive.ObjectID) (bool, error) {
+	filter := bson.M{"email": email}
+	if !excludeUserID.IsZero() {
+		filter["_id"] = bson.M{"$ne": excludeUserID}
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, fmt.Errorf("gagal menghitung dokumen: %w", err)
+	}
+	return count > 0, nil
+}
