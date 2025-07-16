@@ -33,7 +33,7 @@ type LeaveRequestCreatePayload struct {
 	UserID      string `json:"user_id" validate:"required"`
 	StartDate   string `json:"start_date" validate:"required,datetime=2006-01-02"`
 	EndDate     string `json:"end_date" validate:"required,datetime=2006-01-02,gtefield=StartDate"`
-	RequestType string `json:"request_type" validate:"required,oneof=Cuti Sakit Izin"`
+	RequestType string `json:"request_type" validate:"required,oneof=Cuti Sakit"`
 	Reason      string `json:"reason" validate:"required,min=10,max=500"`
 }
 
