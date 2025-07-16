@@ -79,20 +79,6 @@ func InitDatabase() {
 		log.Println("Indeks unik untuk email berhasil dibuat di koleksi users.")
 	}
 
-	// Anda bisa menambahkan inisialisasi indeks lain di sini jika diperlukan
-	// Contoh untuk departemen:
-	// departmentCollection := MongoConn.Database(DBName).Collection(DepartmentCollection)
-	// // Buat indeks unik untuk nama departemen jika diperlukan
-	// indexDeptModel := mongo.IndexModel{
-	// 	Keys:    bson.D{{Key: "name", Value: 1}},
-	// 	Options: options.Index().SetUnique(true),
-	// }
-	// _, err = departmentCollection.Indexes().CreateOne(ctx, indexDeptModel)
-	// if err != nil {
-	// 	log.Printf("Peringatan: Gagal membuat indeks unik untuk nama departemen: %v\n", err)
-	// } else {
-	// 	log.Println("Indeks unik untuk nama departemen berhasil dibuat.")
-	// }
 }
 
 func GetCollection(collectionName string) *mongo.Collection {

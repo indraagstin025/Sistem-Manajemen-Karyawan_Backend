@@ -1,13 +1,13 @@
 package middleware
 
 import (
-	"Sistem-Manajemen-Karyawan/models" // PERUBAHAN: Impor 'models' bukan 'paseto'
+	"Sistem-Manajemen-Karyawan/models" 
 	"github.com/gofiber/fiber/v2"
 )
 
 func AdminMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// ================== PERUBAHAN DIMULAI DI SINI ==================
+
 		
 		// 1. Ambil 'user' dan lakukan type assertion ke *models.Claims
 		claims, ok := c.Locals("user").(*models.Claims)
