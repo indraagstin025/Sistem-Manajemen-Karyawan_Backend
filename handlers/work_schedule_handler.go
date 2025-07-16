@@ -52,11 +52,6 @@ func (h *WorkScheduleHandler) CreateWorkSchedule(c *fiber.Ctx) error {
     return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Jadwal kerja berhasil ditambahkan", "data": createdSchedule})
 }
 
-// ======================================================================================
-// Fungsi dan Struct Terkait Hari Libur
-// ======================================================================================
-
-// Struct pembantu untuk data libur dari API eksternal (lokal untuk parsing)
 type HolidayAPIData struct {
 	Date              string `json:"holiday_date"`
 	Name              string `json:"holiday_name"`
@@ -134,9 +129,6 @@ func (h *WorkScheduleHandler) GetHolidays(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(holidaysData)
 }
 
-// ======================================================================================
-// Akhir Fungsi dan Struct Terkait Hari Libur
-// ======================================================================================
 
 // GetWorkScheduleById mendapatkan satu aturan jadwal kerja berdasarkan ID
 func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
@@ -251,17 +243,10 @@ func (h *WorkScheduleHandler) UpdateWorkSchedule(c *fiber.Ctx) error {
 
 	validate := validator.New()
 	if err := validate.Struct(payload); err != nil {
-		// Jika Anda tidak memiliki config.ValidatorErrors, gunakan ini untuk respons validasi sederhana
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Validasi gagal: " + err.Error()})
-		// Atau, jika Anda punya fungsi kustom untuk error validasi:
-		// return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-		// 	"error":   "Validasi gagal",
-		// 	"details": yourCustomValidationErrorParser(err),
-		// })
 	}
 
-	// Langsung gunakan payload yang sudah divalidasi
-	err = h.workScheduleRepo.UpdateByID(objectID, &payload) // Kirim payload langsung ke repository
+	err = h.workScheduleRepo.UpdateByID(objectID, &payload) 
 	if err != nil {
 		if strings.Contains(err.Error(), "jadwal tidak ditemukan") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Jadwal tidak ditemukan"})

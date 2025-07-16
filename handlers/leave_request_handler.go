@@ -60,14 +60,12 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	// Parsing startDate untuk mendapatkan bulan dan tahun
 	parsedStartDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format tanggal mulai tidak valid. Gunakan YYYY-MM-DD."})
 	}
 
-	// --- PENYESUAIAN VALIDASI MAKSIMAL 1 KALI PER BULAN HANYA UNTUK 'CUTI' ---
-	if requestType == "Cuti" { // Hanya lakukan validasi ini jika jenis pengajuan adalah "Cuti"
+	if requestType == "Cuti" { 
 		currentMonth := parsedStartDate.Month()
 		currentYear := parsedStartDate.Year()
 
@@ -77,15 +75,14 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti."})
 		}
 
-		if existingCount > 0 { // Jika sudah ada satu atau lebih pengajuan Cuti di bulan ini
+		if existingCount > 0 { 
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": fmt.Sprintf("Anda hanya dapat mengajukan 'Cuti' satu kali dalam bulan %s %d.", currentMonth.String(), currentYear),
 			})
 		}
 	}
-	// --- AKHIR PENYESUAIAN ---
 
-	// ❗ Validasi duplikasi pengajuan (hanya untuk tanggal mulai) - Ini memastikan tidak ada pengajuan "Cuti" di hari yang sama, dan berlaku juga untuk "Sakit" dan "Izin"
+
 	existingRequest, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, startDateStr, requestType)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -102,12 +99,11 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	file, _ := c.FormFile("attachment")
 
 	if file != nil {
-		// Validasi ukuran maksimal 2MB
+	
 		if file.Size > 2*1024*1024 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Ukuran file maksimal 2MB"})
 		}
 
-		// Validasi ekstensi file
 		allowedExtensions := map[string]bool{
 			".pdf":  true,
 			".doc":  true,
@@ -121,11 +117,10 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format file tidak didukung"})
 		}
 
-		if requestType == "Sakit" && ext != ".pdf" { // Rule bisnis: Sakit wajib PDF
+		if requestType == "Sakit" && ext != ".pdf" { 
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan Sakit harus berupa file PDF"})
 		}
 
-		// Upload file ke GridFS
 		bucket, err := config.GetGridFSBucket()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses penyimpanan file"})
@@ -150,11 +145,10 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 
 		attachmentURL = fmt.Sprintf("/api/v1/files/%s", uploadStream.FileID.(primitive.ObjectID).Hex())
 	} else if requestType == "Sakit" {
-		// Jika ini pengajuan Sakit dan tidak ada file diupload
+
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Lampiran wajib untuk pengajuan Sakit"})
 	}
 
-	// Simpan data pengajuan ke database
 	newRequest := &models.LeaveRequest{
 		ID:            primitive.NewObjectID(),
 		UserID:        claims.UserID,
@@ -193,8 +187,8 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal mengambil data pengajuan"
 // @Router /leave-requests [get]
 func (h *LeaveRequestHandler) GetAllLeaveRequests(c *fiber.Ctx) error {
-	// PERBAIKAN DI SINI: Deklarasikan variabel dengan tipe yang benar
-	requests, err := h.leaveRepo.FindAll() // Sekarang FindAll mengembalikan []models.LeaveRequestWithUser
+	
+	requests, err := h.leaveRepo.FindAll() 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal mengambil data pengajuan: %v", err)})
 	}
@@ -218,8 +212,7 @@ func (h *LeaveRequestHandler) GetMyLeaveRequests(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid atau sesi rusak"})
 	}
 
-	// Memanggil repository untuk mencari pengajuan berdasarkan UserID
-	requests, err := h.leaveRepo.FindByUserID(c.Context(), claims.UserID) // <-- Membutuhkan FindByUserID di repository
+	requests, err := h.leaveRepo.FindByUserID(c.Context(), claims.UserID) 
 	if err != nil {
 		log.Printf("ERROR: Gagal mengambil pengajuan cuti untuk user %s: %v", claims.UserID.Hex(), err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal mengambil data pengajuan: %v", err)})
@@ -250,7 +243,6 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID pengajuan tidak valid"})
 	}
 
-	// Ambil file dari form-data
 	fileHeader, err := c.FormFile("attachment")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "File tidak ditemukan"})
@@ -284,9 +276,8 @@ func (h *LeaveRequestHandler) UploadAttachment(c *fiber.Ctx) error {
 	log.Printf("Berhasil upload ke GridFS (%d bytes)\n", fileSize)
 
 	fileID := uploadStream.FileID.(primitive.ObjectID)
-	fileURL := fmt.Sprintf("/api/v1/files/%s", fileID.Hex()) // disimpan di database
+	fileURL := fmt.Sprintf("/api/v1/files/%s", fileID.Hex()) 
 
-	// Simpan fileURL ke database leave request
 	_, err = h.leaveRepo.UpdateAttachmentURL(reqID, fileURL)
 	if err != nil {
 		log.Println("Gagal menyimpan URL lampiran ke DB:", err)

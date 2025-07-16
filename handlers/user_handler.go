@@ -12,7 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo" // Pastikan ini diimpor untuk mongo.Pipeline dan mongo.Cursor
+	"go.mongodb.org/mongo-driver/mongo" 
 
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
@@ -22,10 +22,8 @@ import (
 
 type UserHandler struct {
 	userRepo   *repository.UserRepository
-	deptRepo   repository.DepartmentRepository    // BARU: Tambahkan DepartmentRepository
-	leaveRepo  repository.LeaveRequestRepository  // BARU: Tambahkan LeaveRequestRepository
-	// Anda mungkin juga perlu AttendanceRepository jika ingin menghitung 'KaryawanCuti' dari absensi
-	// attendanceRepo *repository.AttendanceRepository
+	deptRepo   repository.DepartmentRepository    
+	leaveRepo  repository.LeaveRequestRepository  
 }
 
 // Perbarui konstruktor untuk menginisialisasi semua repository yang dibutuhkan.
@@ -33,15 +31,14 @@ type UserHandler struct {
 // repository di file main.go Anda.
 func NewUserHandler(
 	userRepo *repository.UserRepository,
-	deptRepo repository.DepartmentRepository,     // Tambahkan parameter ini
-	leaveRepo repository.LeaveRequestRepository,  // Tambahkan parameter ini
-	// attendanceRepo *repository.AttendanceRepository, // Tambahkan ini jika dibutuhkan
+	deptRepo repository.DepartmentRepository,     
+	leaveRepo repository.LeaveRequestRepository,  
+	
 ) *UserHandler {
 	return &UserHandler{
 		userRepo:   userRepo,
-		deptRepo:   deptRepo,   // Inisialisasi
-		leaveRepo:  leaveRepo,  // Inisialisasi
-		// attendanceRepo: attendanceRepo, // Inisialisasi
+		deptRepo:   deptRepo,   
+		leaveRepo:  leaveRepo,  
 	}
 }
 
@@ -79,27 +76,26 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
     ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
     defer cancel()
 
-    user, err := h.userRepo.FindUserByID(ctx, objID) // Baris ini akan mengembalikan (nil, nil) jika tidak ditemukan
+    user, err := h.userRepo.FindUserByID(ctx, objID) 
 
-    // >>>>> INI KODE YANG WAJIB ANDA TAMBAHKAN/PASTIKAN ADA <<<<<
-    // Periksa apakah user ditemukan (tidak nil) DAN tidak ada error yang menunjukkan 'tidak ditemukan'
+    
     if user == nil {
-        if err == nil || err == mongo.ErrNoDocuments { // Jika user nil dan error juga nil, atau errornya ErrNoDocuments
+        if err == nil || err == mongo.ErrNoDocuments { 
             return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
         }
-        // Jika user nil tapi ada error lain (selain ErrNoDocuments), ini masalah di repo
+        
         log.Printf("ERROR: FindUserByID mengembalikan user nil dengan error: %v", err)
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal mendapatkan user (data kosong atau error repo)."})
     }
-    // >>>>> AKHIR KODE YANG WAJIB ADA <<<<<
+   
 
 
-    if err != nil { // Blok ini akan menangani error lain dari repo (selain ErrNoDocuments)
+    if err != nil { 
         log.Printf("Error getting user by ID: %v", err)
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
     }
 
-    user.Password = "" // Baris ini sekarang aman karena 'user' dipastikan tidak nil
+    user.Password = "" 
     return c.Status(fiber.StatusOK).JSON(user)
 }
 
@@ -312,33 +308,26 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
     ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second) // Tambahkan timeout yang cukup
     defer cancel()
 
-    // 1. Total Karyawan (total user di sistem)
     totalUsers, err := h.userRepo.CountDocuments(ctx, bson.M{})
     if err != nil {
         log.Printf("Error menghitung total user: %v", err) // Log error
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total user."})
     }
 
-    // 2. Karyawan Aktif (user dengan role "karyawan")
     activeUsers, err := h.userRepo.CountDocuments(ctx, bson.M{"role": "karyawan"})
     if err != nil {
         log.Printf("Error menghitung karyawan aktif: %v", err)
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung karyawan aktif."})
     }
 
-    // 3. Jumlah Karyawan Sedang Cuti (Placeholder, sesuaikan dengan logika riil Anda)
-    // Jika Anda ingin menghitung ini dari Attendance, pastikan Anda punya attendanceRepo di handler ini
     karyawanCuti := int64(0) 
 
-    // 4. Pengajuan Cuti/Izin Tertunda
-    // Memastikan h.leaveRepo ada dan method CountPendingRequests tersedia
     pendingLeavesCount, err := h.leaveRepo.CountPendingRequests(ctx)
     if err != nil {
         log.Printf("Error menghitung pengajuan tertunda: %v", err)
-        pendingLeavesCount = 0 // Tetapkan 0 jika terjadi error
+        pendingLeavesCount = 0 
     }
 
-    // 5. Posisi Baru (karyawan yang dibuat dalam 30 hari terakhir)
     thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
     newPositions, err := h.userRepo.CountDocuments(ctx, bson.M{"created_at": bson.M{"$gte": thirtyDaysAgo}})
     if err != nil {
@@ -346,9 +335,7 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung posisi baru."})
     }
 
-    // 6. Distribusi Departemen (Total Departemen dan hitungan per departemen)
-    // Memastikan h.deptRepo ada dan method CountDocuments tersedia
-    totalDepartemen, err := h.deptRepo.CountDocuments(ctx, bson.M{}) // Asumsi ada CountDocuments di deptRepo
+    totalDepartemen, err := h.deptRepo.CountDocuments(ctx, bson.M{}) 
     if err != nil {
         log.Printf("Error menghitung total departemen: %v", err)
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total departemen."})
@@ -380,7 +367,6 @@ func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
         return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mendecode distribusi departemen."})
     }
 
-    // 7. Aktivitas Terbaru (contoh statis)
     latestActivities := []string{
         "Sistem HR-System dimulai.",
         "Admin login ke dashboard.",
@@ -484,7 +470,6 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 
 	photoID := uploadStream.FileID.(primitive.ObjectID)
 
-	// Simpan ke user
 	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
 	defer cancel()
 
@@ -550,7 +535,6 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca foto dari GridFS"})
 	}
 
-	// Set MIME type yang disimpan (default ke JPEG jika kosong)
 	contentType := "image/jpeg"
 	if user.PhotoMime != "" {
 		contentType = user.PhotoMime

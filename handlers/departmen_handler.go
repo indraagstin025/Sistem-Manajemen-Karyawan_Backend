@@ -154,9 +154,8 @@ func (h *DepartmentHandler) UpdateDepartment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	// NEW: Gunakan langsung utils.ValidateStruct
 	if errors := util.ValidateStruct(updatePayload); errors != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errors}) // Mengembalikan slice errors langsung
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errors})
 	}
 
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
@@ -164,12 +163,11 @@ func (h *DepartmentHandler) UpdateDepartment(c *fiber.Ctx) error {
 
 	updateData := bson.M{}
 	if updatePayload.Name != "" {
-		// Cek duplikasi nama jika nama diubah
 		existingDept, err := h.deptRepo.FindDepartmentByName(ctx, updatePayload.Name)
 		if err != nil && err.Error() != "departemen tidak ditemukan" {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("Gagal memeriksa departemen: %v", err)})
 		}
-		if existingDept != nil && existingDept.ID != objID { // Jika nama sudah ada dan bukan departemen yang sedang diupdate
+		if existingDept != nil && existingDept.ID != objID { 
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Nama departemen sudah ada"})
 		}
 		updateData["name"] = updatePayload.Name

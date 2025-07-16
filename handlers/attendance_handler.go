@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"context" // Pastikan ini diimpor
+	"context" 
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/repository" // Pastikan path ini benar
+	"Sistem-Manajemen-Karyawan/repository" 
 )
 
 type AttendanceHandler struct {
@@ -55,24 +55,20 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid: " + err.Error()})
 	}
 	
-	// Tentukan tanggal "hari ini" berdasarkan zona waktu WIB
 	wib, _ := time.LoadLocation("Asia/Jakarta")
 	today := time.Now().In(wib).Format("2006-01-02")
 
-	// Validasi QR Code...
 	qrCode, err := h.repo.FindQRCodeByValue(c.Context(), payload.QRCodeValue)
 	if err != nil || qrCode == nil || qrCode.Date != today || time.Now().In(wib).After(qrCode.ExpiresAt) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR Code tidak valid atau sudah kadaluarsa."})
 	}
 	
-	// Validasi User ID dan cek duplikasi...
 	userID, _ := primitive.ObjectIDFromHex(payload.UserID)
 	existingAttendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), userID, today)
 	if err == nil && existingAttendance != nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Anda sudah melakukan check-in hari ini."})
 	}
 	
-	// Ambil jadwal kerja untuk hari ini
 	schedule, err := h.workScheduleRepo.FindByDate(today)
 	if err != nil || len(schedule) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -81,7 +77,6 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	}
 	todaysSchedule := schedule[0]
 
-	// Tentukan status Tepat Waktu / Terlambat
 	currentTimeInWIB := time.Now().In(wib)
 	scheduledStartTime, _ := time.ParseInLocation("15:04", todaysSchedule.StartTime, wib)
 	
@@ -100,15 +95,14 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		attendanceStatus = "Tepat Waktu"
 	}
 
-	// Proses Check-In
 newAttendance := models.Attendance{
 	ID:        primitive.NewObjectID(),
 	UserID:    userID,
 	Date:      today,
 	CheckIn:   currentTimeInWIB.Format("15:04"),
 	Status:    attendanceStatus,
-	CreatedAt: currentTimeInWIB,  // ✅ waktu lokal (WIB)
-	UpdatedAt: currentTimeInWIB,  // ✅ waktu lokal (WIB)
+	CreatedAt: currentTimeInWIB,
+	UpdatedAt: currentTimeInWIB,
 }
 
 	_, err = h.repo.CreateAttendance(c.Context(), &newAttendance)
@@ -137,21 +131,15 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 
-    // --- PERBAIKAN ZONA WAKTU DIMULAI DI SINI ---
-	// Tentukan lokasi WIB untuk konsistensi
 	wib, _ := time.LoadLocation("Asia/Jakarta")
-    // Dapatkan waktu dan tanggal saat ini menurut zona waktu WIB
 	currentTimeInWIB := time.Now().In(wib)
 	todayStr := currentTimeInWIB.Format("2006-01-02")
-    // --- AKHIR PERBAIKAN ZONA WAKTU ---
 
 
-	// Cari QR Code yang masih aktif untuk hari ini
 	existingQRCode, err := h.repo.FindActiveQRCodeByDate(ctx, todayStr)
 
-	// Gunakan currentTimeInWIB untuk perbandingan
 	if err == nil && existingQRCode != nil && currentTimeInWIB.Before(existingQRCode.ExpiresAt) {
-		// (Kode untuk mengembalikan QR code yang sudah ada tetap sama)
+	
 		png, err := qrcode.Encode(existingQRCode.Code, qrcode.Medium, 256)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal re-encode gambar QR Code yang sudah ada."})
@@ -165,18 +153,17 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-	// Jika tidak ada QR Code aktif, buat yang baru
+
 	uniqueCode := uuid.New().String()
-	// Hitung waktu kadaluarsa dari waktu WIB saat ini
 	expiresAt := currentTimeInWIB.Add(QR_CODE_DURATION) 
 
 	newQRCode := &models.QRCode{
 		ID:        primitive.NewObjectID(),
 		Code:      uniqueCode,
-		Date:      todayStr, // Gunakan tanggal WIB
+		Date:      todayStr, 
 		ExpiresAt: expiresAt,
-		CreatedAt: currentTimeInWIB, // Gunakan waktu WIB
-		UpdatedAt: currentTimeInWIB, // Gunakan waktu WIB
+		CreatedAt: currentTimeInWIB, 
+		UpdatedAt: currentTimeInWIB, 
 	}
 
 	_, err = h.repo.CreateQRCode(ctx, newQRCode)
@@ -248,10 +235,9 @@ func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
 		filter["user_id"] = objID
 	}
 
-	// Parsing tanggal untuk filter
+
 	if startDateStr != "" && endDateStr != "" {
-		// Asumsi tanggal disimpan dalam format "YYYY-MM-DD" di DB
-		// Pastikan tanggal yang masuk juga dalam format ini
+		
 		filter["date"] = bson.M{
 			"$gte": startDateStr,
 			"$lte": endDateStr,
@@ -265,7 +251,6 @@ func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
 	defer cancel()
 
-	// Anda perlu menambahkan method ini di AttendanceRepository Anda
 	attendances, total, err := h.repo.GetAllAttendancesWithUserDetails(ctx, filter, int64(page), int64(limit))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil riwayat kehadiran: " + err.Error()})
@@ -296,7 +281,6 @@ today := time.Now().In(wib).Format("2006-01-02")
 	
 	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), claims.UserID, today)
 	if err != nil {
-		// Jika tidak ditemukan, anggap saja "Belum Absen", bukan error server
 		return c.Status(fiber.StatusOK).JSON(nil)
 	}
 
@@ -350,10 +334,8 @@ func (h *AttendanceHandler) GetMyAttendanceHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	// Gunakan UserID dari claims untuk keamanan
 	userID := claims.UserID
 
-	// --- FindAttendanceByUserID sekarang menerima context ---
 	attendanceHistory, err := h.repo.FindAttendanceByUserID(c.Context(), userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -361,7 +343,6 @@ func (h *AttendanceHandler) GetMyAttendanceHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	// Jika tidak ada data, kembalikan array kosong, bukan error
 	if attendanceHistory == nil {
 		return c.Status(fiber.StatusOK).JSON([]models.Attendance{})
 	}
