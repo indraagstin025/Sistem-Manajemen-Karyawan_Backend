@@ -72,9 +72,9 @@ type DashboardStats struct {
 	TotalKaryawan         int64             `json:"total_karyawan"`
 	KaryawanAktif         int64             `json:"karyawan_aktif"`
 	KaryawanCuti          int64             `json:"karyawan_cuti"`
-	PendingLeaveRequestsCount int64         `json:"pending_leave_requests_count"` // <-- BARU: Untuk jumlah pengajuan tertunda
+	PendingLeaveRequestsCount int64         `json:"pending_leave_requests_count"` 
 	PosisiBaru            int64             `json:"posisi_baru"`
-	TotalDepartemen       int64             `json:"total_departemen"` // Tambahkan ini juga jika belum ada hitungan di handler
+	TotalDepartemen       int64             `json:"total_departemen"` 
 	DistribusiDepartemen  []DepartmentCount `json:"distribusi_departemen"`
 	AktivitasTerbaru      []string          `json:"aktivitas_terbaru"`
 }

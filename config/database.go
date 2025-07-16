@@ -15,10 +15,9 @@ import (
 
 var MongoConn *mongo.Client
 
-// Nama Database
+
 var DBName string = "manajemen-karyawan-db"
 
-// Deklarasi semua nama koleksi di sini
 var UserCollection string = "users"
 var DepartmentCollection string = "departments"
 var AttendanceCollection string = "attendances"
@@ -64,12 +63,12 @@ func InitDatabase() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	userCollection := MongoConn.Database(DBName).Collection(UserCollection) // Menggunakan UserCollection dari file ini
+	userCollection := MongoConn.Database(DBName).Collection(UserCollection) 
 
-	// Buat indeks unik untuk field 'email' di koleksi 'users'
+	
 	indexModel := mongo.IndexModel{
-		Keys:    bson.D{{Key: "email", Value: 1}}, // Indeks di field 'email', ascending
-		Options: options.Index().SetUnique(true),  // Jadikan indeks unik
+		Keys:    bson.D{{Key: "email", Value: 1}}, 
+		Options: options.Index().SetUnique(true),  
 	}
 
 	_, err := userCollection.Indexes().CreateOne(ctx, indexModel)

@@ -16,7 +16,6 @@ type AppConfig struct {
 	PASETO_SECRET string
 }
 
-// LoadConfig loads configuration from .env file
 func LoadConfig() *AppConfig {
 	err := godotenv.Load()
 	if err != nil {
@@ -25,7 +24,6 @@ func LoadConfig() *AppConfig {
 
 	secretBase64 := getEnv("PASETO_SECRET", "default_paseto_secret_base64_mustbe32bytes_") 
 
-	// Lakukan decoding untuk validasi panjang byte
 	secretBytes, err := base64.URLEncoding.DecodeString(secretBase64)
 	if err != nil {
 		log.Fatalf("PASETO_SECRET in .env is not a valid Base64 URL-encoded string: %v", err)
@@ -42,7 +40,6 @@ func LoadConfig() *AppConfig {
 	}
 }
 
-// Helper function to get environment variable or fallback to default
 func getEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value

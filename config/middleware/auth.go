@@ -21,16 +21,13 @@ func AuthMiddleware() fiber.Handler {
 
 		tokenString := parts[1]
 
-		// ================== PERUBAHAN DIMULAI DI SINI ==================
-
-		// 1. Buat instance PasetoMaker baru
+		
 		pasetoMaker, err := paseto.NewPasetoMaker()
 		if err != nil {
 	
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Server error: tidak bisa memproses token"})
 		}
 
-		// 2. Panggil method ValidateToken dari instance maker
 		claims, err := pasetoMaker.ValidateToken(tokenString)
 		if err != nil {
 		
