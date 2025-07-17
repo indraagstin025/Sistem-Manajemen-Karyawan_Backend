@@ -633,6 +633,232 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/work-schedules": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Membuat jadwal kerja baru dengan opsi recurrence rule (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create Work Schedule",
+                "parameters": [
+                    {
+                        "description": "Data jadwal kerja baru",
+                        "name": "schedule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.WorkScheduleCreatePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Jadwal kerja berhasil ditambahkan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/definitions/models.WorkSchedule"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Format data tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal menyimpan jadwal kerja",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/work-schedules/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Memperbarui jadwal kerja berdasarkan ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update Work Schedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Work Schedule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data update jadwal kerja",
+                        "name": "schedule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.WorkScheduleUpdatePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Jadwal kerja berhasil diperbarui",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID tidak valid atau validasi gagal",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jadwal tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal memperbarui jadwal kerja",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Menghapus jadwal kerja berdasarkan ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete Work Schedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Work Schedule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Jadwal kerja berhasil dihapus",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID jadwal kerja tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jadwal tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal menghapus jadwal kerja",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/attendance/generate-qr": {
             "get": {
                 "security": [
@@ -727,6 +953,45 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Gagal mengambil riwayat absensi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attendance/my-today": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil data absensi hari ini untuk user yang sedang login",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Attendance"
+                ],
+                "summary": "Get My Today's Attendance",
+                "responses": {
+                    "200": {
+                        "description": "Null jika belum ada absensi hari ini",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1046,6 +1311,146 @@ const docTemplate = `{
                 }
             }
         },
+        "/files/by-name/{filename}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil file dari GridFS berdasarkan nama file dan mengirimkannya sebagai response",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Files"
+                ],
+                "summary": "Get File from GridFS by Filename",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filename",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File berhasil diambil",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Nama file tidak boleh kosong",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "File tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengakses atau membaca file",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil file dari GridFS berdasarkan file ID dan mengirimkannya sebagai response",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Files"
+                ],
+                "summary": "Get File from GridFS by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File berhasil diambil",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Format File ID tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "File tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengakses atau membaca file",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/leave-requests": {
             "get": {
                 "security": [
@@ -1093,9 +1498,9 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Membuat pengajuan izin/cuti/sakit baru",
+                "description": "Membuat pengajuan cuti atau sakit baru. Untuk 'Cuti', hanya bisa satu tanggal per pengajuan dan dibatasi 12 kali setahun. Untuk 'Sakit', bisa rentang tanggal.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -1106,24 +1511,61 @@ const docTemplate = `{
                 "summary": "Create Leave Request",
                 "parameters": [
                     {
-                        "description": "Data pengajuan izin",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.LeaveRequestCreatePayload"
-                        }
+                        "enum": [
+                            "Cuti",
+                            "Sakit"
+                        ],
+                        "type": "string",
+                        "description": "Jenis Pengajuan (Cuti, Sakit)",
+                        "name": "request_type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tanggal Mulai (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tanggal Selesai (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Alasan Pengajuan",
+                        "name": "reason",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Lampiran (Wajib untuk Sakit, maks 2MB)",
+                        "name": "attachment",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Pengajuan berhasil dibuat",
+                        "description": "Pengajuan berhasil dikirim",
                         "schema": {
-                            "$ref": "#/definitions/models.LeaveRequest"
+                            "type": "object",
+                            "properties": {
+                                " request": {
+                                    "$ref": "#/definitions/models.LeaveRequest"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "400": {
-                        "description": "Payload tidak valid",
+                        "description": "Input tidak valid",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1133,8 +1575,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "401": {
-                        "description": "Tidak terautentikasi",
+                    "403": {
+                        "description": "Akses ditolak (misal: sudah mencapai batas tahunan cuti, atau sudah ada pengajuan di tanggal tersebut)",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1145,7 +1587,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Gagal membuat pengajuan",
+                        "description": "Kesalahan server internal",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1199,6 +1641,62 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Gagal mengambil data pengajuan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/leave-requests/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil ringkasan jumlah pengajuan cuti (per bulan dan per tahun) untuk karyawan yang sedang login.\nMengambil ringkasan jumlah pengajuan cuti (per tahun) untuk karyawan yang sedang login.",
+                "consumes": [
+                    "application/json",
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json",
+                    "application/json"
+                ],
+                "tags": [
+                    "Leave Request",
+                    "Leave Request"
+                ],
+                "summary": "Get Leave Request Summary for current user",
+                "responses": {
+                    "200": {
+                        "description": "Ringkasan pengajuan cuti berhasil diambil",
+                        "schema": {
+                            "$ref": "#/definitions/models.LeaveSummaryResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Tidak terautentikasi",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil ringkasan pengajuan",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1546,7 +2044,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update data user (user hanya bisa update data diri sendiri, admin bisa update semua)",
+                "description": "Update data user (user hanya bisa update data diri sendiri, admin bisa update semua, karyawan sekarang bisa mengubah email sendiri)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1636,6 +2134,85 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}/photo": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan redirect ke placeholder",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get User Profile Photo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Foto profil berhasil diambil",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "307": {
+                        "description": "Redirect ke placeholder image",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "ID user tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil foto profil",
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1754,6 +2331,199 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/work-schedules": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil semua jadwal kerja dalam rentang tanggal tertentu dengan filter hari libur",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Work Schedule"
+                ],
+                "summary": "Get All Work Schedules",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tanggal mulai (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tanggal selesai (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar jadwal kerja berhasil diambil",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "data": {
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Format tanggal tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil jadwal kerja",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/work-schedules/holidays": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil daftar hari libur nasional untuk tahun tertentu",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Work Schedule"
+                ],
+                "summary": "Get Holidays",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tahun (default: tahun sekarang)",
+                        "name": "year",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data hari libur berhasil diambil",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil data hari libur",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/work-schedules/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mengambil detail jadwal kerja berdasarkan ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Work Schedule"
+                ],
+                "summary": "Get Work Schedule by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Work Schedule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Jadwal kerja berhasil diambil",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "data": {
+                                    "$ref": "#/definitions/models.WorkSchedule"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID jadwal kerja tidak valid",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jadwal kerja tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal mengambil jadwal kerja",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1779,16 +2549,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "description": "--- DISESUAIKAN ---",
                     "type": "string",
                     "enum": [
                         "Hadir",
-                        "Telat",
-                        "Izin",
+                        "Terlambat",
                         "Sakit",
                         "Cuti",
-                        "Alpha",
-                        "Belum",
-                        "Absen"
+                        "Izin",
+                        "Alpha"
                     ]
                 },
                 "updated_at": {
@@ -1959,40 +2728,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LeaveRequestCreatePayload": {
-            "type": "object",
-            "required": [
-                "end_date",
-                "reason",
-                "request_type",
-                "start_date",
-                "user_id"
-            ],
-            "properties": {
-                "end_date": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 10
-                },
-                "request_type": {
-                    "type": "string",
-                    "enum": [
-                        "Cuti",
-                        "Sakit",
-                        "Izin"
-                    ]
-                },
-                "start_date": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
         "models.LeaveRequestUpdatePayload": {
             "type": "object",
             "required": [
@@ -2060,6 +2795,17 @@ const docTemplate = `{
                 "user_photo": {
                     "description": "\u003c--- UBAH DARI \"user_info.photo\" MENJADI \"user_photo\"",
                     "type": "string"
+                }
+            }
+        },
+        "models.LeaveSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "annual_leave_count": {
+                    "type": "integer"
+                },
+                "current_month_leave_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -2202,6 +2948,87 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "position": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.WorkSchedule": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "date": {
+                    "description": "Akan menjadi tanggal MULAI jadwal",
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "recurrence_rule": {
+                    "description": "\u003c-- TAMBAHKAN INI",
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.WorkScheduleCreatePayload": {
+            "type": "object",
+            "required": [
+                "date",
+                "end_time",
+                "start_time"
+            ],
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "recurrence_rule": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.WorkScheduleUpdatePayload": {
+            "type": "object",
+            "required": [
+                "date",
+                "end_time",
+                "start_time"
+            ],
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "recurrence_rule": {
+                    "type": "string"
+                },
+                "start_time": {
                     "type": "string"
                 }
             }

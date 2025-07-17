@@ -21,7 +21,19 @@ func NewFileHandler() *FileHandler {
 	return &FileHandler{}
 }
 
-// GetFileFromGridFS adalah fungsi yang akan mengambil file dari database dan mengirimkannya.
+// GetFileFromGridFS godoc
+// @Summary Get File from GridFS by ID
+// @Description Mengambil file dari GridFS berdasarkan file ID dan mengirimkannya sebagai response
+// @Tags Files
+// @Accept json
+// @Produce application/octet-stream
+// @Security BearerAuth
+// @Param id path string true "File ID"
+// @Success 200 {file} file "File berhasil diambil"
+// @Failure 400 {object} object{error=string} "Format File ID tidak valid"
+// @Failure 404 {object} object{error=string} "File tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal mengakses atau membaca file"
+// @Router /files/{id} [get]
 func (h *FileHandler) GetFileFromGridFS(c *fiber.Ctx) error {
 	fileIDHex := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(fileIDHex)
@@ -59,7 +71,19 @@ func (h *FileHandler) GetFileFromGridFS(c *fiber.Ctx) error {
 }
 
 
-// GetFileByFilename mengambil file dari GridFS berdasarkan nama file
+// GetFileByFilename godoc
+// @Summary Get File from GridFS by Filename
+// @Description Mengambil file dari GridFS berdasarkan nama file dan mengirimkannya sebagai response
+// @Tags Files
+// @Accept json
+// @Produce application/octet-stream
+// @Security BearerAuth
+// @Param filename path string true "Filename"
+// @Success 200 {file} file "File berhasil diambil"
+// @Failure 400 {object} object{error=string} "Nama file tidak boleh kosong"
+// @Failure 404 {object} object{error=string} "File tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal mengakses atau membaca file"
+// @Router /files/by-name/{filename} [get]
 func (h *FileHandler) GetFileByFilename(c *fiber.Ctx) error {
 	filename := c.Params("filename")
 	if filename == "" {

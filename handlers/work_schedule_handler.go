@@ -31,6 +31,18 @@ func NewWorkScheduleHandler(repo *repository.WorkScheduleRepository) *WorkSchedu
 // TELAH DIHAPUS DARI FILE INI KARENA SUDAH PINDAH KE pkg/utils
 // ======================================================================
 
+// CreateWorkSchedule godoc
+// @Summary Create Work Schedule
+// @Description Membuat jadwal kerja baru dengan opsi recurrence rule (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param schedule body models.WorkScheduleCreatePayload true "Data jadwal kerja baru"
+// @Success 201 {object} object{message=string,data=models.WorkSchedule} "Jadwal kerja berhasil ditambahkan"
+// @Failure 400 {object} object{error=string} "Format data tidak valid"
+// @Failure 500 {object} object{error=string} "Gagal menyimpan jadwal kerja"
+// @Router /admin/work-schedules [post]
 func (h *WorkScheduleHandler) CreateWorkSchedule(c *fiber.Ctx) error {
 	var payload models.WorkScheduleCreatePayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -56,7 +68,17 @@ func (h *WorkScheduleHandler) CreateWorkSchedule(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Jadwal kerja berhasil ditambahkan", "data": createdSchedule})
 }
 
-
+// GetHolidays godoc
+// @Summary Get Holidays
+// @Description Mengambil daftar hari libur nasional untuk tahun tertentu
+// @Tags Work Schedule
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param year query string false "Tahun (default: tahun sekarang)"
+// @Success 200 {object} object "Data hari libur berhasil diambil"
+// @Failure 500 {object} object{error=string} "Gagal mengambil data hari libur"
+// @Router /work-schedules/holidays [get]
 func (h *WorkScheduleHandler) GetHolidays(c *fiber.Ctx) error {
 	year := c.Query("year")
 	if year == "" {
@@ -71,6 +93,19 @@ func (h *WorkScheduleHandler) GetHolidays(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(holidaysData)
 }
 
+// GetWorkScheduleById godoc
+// @Summary Get Work Schedule by ID
+// @Description Mengambil detail jadwal kerja berdasarkan ID
+// @Tags Work Schedule
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Work Schedule ID"
+// @Success 200 {object} object{data=models.WorkSchedule} "Jadwal kerja berhasil diambil"
+// @Failure 400 {object} object{error=string} "ID jadwal kerja tidak valid"
+// @Failure 404 {object} object{error=string} "Jadwal kerja tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal mengambil jadwal kerja"
+// @Router /work-schedules/{id} [get]
 func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
 	scheduleID := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(scheduleID)
@@ -89,7 +124,19 @@ func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": schedule})
 }
 
-// GetAllWorkSchedules sekarang memanggil fungsi dari package utils
+// GetAllWorkSchedules godoc
+// @Summary Get All Work Schedules
+// @Description Mengambil semua jadwal kerja dalam rentang tanggal tertentu dengan filter hari libur
+// @Tags Work Schedule
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param start_date query string true "Tanggal mulai (YYYY-MM-DD)"
+// @Param end_date query string true "Tanggal selesai (YYYY-MM-DD)"
+// @Success 200 {object} object{data=array} "Daftar jadwal kerja berhasil diambil"
+// @Failure 400 {object} object{error=string} "Format tanggal tidak valid"
+// @Failure 500 {object} object{error=string} "Gagal mengambil jadwal kerja"
+// @Router /work-schedules [get]
 func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 	layout := "2006-01-02"
 	startDateStr := c.Query("start_date")
@@ -164,6 +211,20 @@ func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": finalSchedules})
 }
 
+// UpdateWorkSchedule godoc
+// @Summary Update Work Schedule
+// @Description Memperbarui jadwal kerja berdasarkan ID (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Work Schedule ID"
+// @Param schedule body models.WorkScheduleUpdatePayload true "Data update jadwal kerja"
+// @Success 200 {object} object{message=string} "Jadwal kerja berhasil diperbarui"
+// @Failure 400 {object} object{error=string} "ID tidak valid atau validasi gagal"
+// @Failure 404 {object} object{error=string} "Jadwal tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal memperbarui jadwal kerja"
+// @Router /admin/work-schedules/{id} [put]
 func (h *WorkScheduleHandler) UpdateWorkSchedule(c *fiber.Ctx) error {
 	scheduleID := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(scheduleID)
@@ -192,6 +253,19 @@ func (h *WorkScheduleHandler) UpdateWorkSchedule(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Jadwal kerja berhasil diperbarui"})
 }
 
+// DeleteWorkSchedule godoc
+// @Summary Delete Work Schedule
+// @Description Menghapus jadwal kerja berdasarkan ID (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Work Schedule ID"
+// @Success 200 {object} object{message=string} "Jadwal kerja berhasil dihapus"
+// @Failure 400 {object} object{error=string} "ID jadwal kerja tidak valid"
+// @Failure 404 {object} object{error=string} "Jadwal tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal menghapus jadwal kerja"
+// @Router /admin/work-schedules/{id} [delete]
 func (h *WorkScheduleHandler) DeleteWorkSchedule(c *fiber.Ctx) error {
 	scheduleID := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(scheduleID)

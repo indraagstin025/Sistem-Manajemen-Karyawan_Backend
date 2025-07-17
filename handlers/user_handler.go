@@ -518,6 +518,20 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 	})
 }
 
+// GetProfilePhoto godoc
+// @Summary Get User Profile Photo
+// @Description Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan redirect ke placeholder
+// @Tags Users
+// @Accept json
+// @Produce image/jpeg,image/png,image/gif,image/webp
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {file} file "Foto profil berhasil diambil"
+// @Success 307 {string} string "Redirect ke placeholder image"
+// @Failure 400 {object} object{error=string} "ID user tidak valid"
+// @Failure 404 {object} object{error=string} "User tidak ditemukan"
+// @Failure 500 {object} object{error=string} "Gagal mengambil foto profil"
+// @Router /users/{id}/photo [get]
 func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 	userID := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(userID)

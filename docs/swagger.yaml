@@ -15,15 +15,14 @@ definitions:
       note:
         type: string
       status:
+        description: '--- DISESUAIKAN ---'
         enum:
         - Hadir
-        - Telat
-        - Izin
+        - Terlambat
         - Sakit
         - Cuti
+        - Izin
         - Alpha
-        - Belum
-        - Absen
         type: string
       updated_at:
         type: string
@@ -136,31 +135,6 @@ definitions:
       user_id:
         type: string
     type: object
-  models.LeaveRequestCreatePayload:
-    properties:
-      end_date:
-        type: string
-      reason:
-        maxLength: 500
-        minLength: 10
-        type: string
-      request_type:
-        enum:
-        - Cuti
-        - Sakit
-        - Izin
-        type: string
-      start_date:
-        type: string
-      user_id:
-        type: string
-    required:
-    - end_date
-    - reason
-    - request_type
-    - start_date
-    - user_id
-    type: object
   models.LeaveRequestUpdatePayload:
     properties:
       note:
@@ -208,6 +182,13 @@ definitions:
       user_photo:
         description: <--- UBAH DARI "user_info.photo" MENJADI "user_photo"
         type: string
+    type: object
+  models.LeaveSummaryResponse:
+    properties:
+      annual_leave_count:
+        type: integer
+      current_month_leave_count:
+        type: integer
     type: object
   models.User:
     properties:
@@ -307,6 +288,61 @@ definitions:
         type: string
       position:
         type: string
+    type: object
+  models.WorkSchedule:
+    properties:
+      created_at:
+        type: string
+      date:
+        description: Akan menjadi tanggal MULAI jadwal
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      recurrence_rule:
+        description: <-- TAMBAHKAN INI
+        type: string
+      start_time:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.WorkScheduleCreatePayload:
+    properties:
+      date:
+        type: string
+      end_time:
+        type: string
+      note:
+        type: string
+      recurrence_rule:
+        type: string
+      start_time:
+        type: string
+    required:
+    - date
+    - end_time
+    - start_time
+    type: object
+  models.WorkScheduleUpdatePayload:
+    properties:
+      date:
+        type: string
+      end_time:
+        type: string
+      note:
+        type: string
+      recurrence_rule:
+        type: string
+      start_time:
+        type: string
+    required:
+    - date
+    - end_time
+    - start_time
     type: object
 host: localhost:3000
 info:
@@ -709,6 +745,148 @@ paths:
       summary: Delete User
       tags:
       - Admin
+  /admin/work-schedules:
+    post:
+      consumes:
+      - application/json
+      description: Membuat jadwal kerja baru dengan opsi recurrence rule (admin only)
+      parameters:
+      - description: Data jadwal kerja baru
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/models.WorkScheduleCreatePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Jadwal kerja berhasil ditambahkan
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/models.WorkSchedule'
+              message:
+                type: string
+            type: object
+        "400":
+          description: Format data tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal menyimpan jadwal kerja
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create Work Schedule
+      tags:
+      - Admin
+  /admin/work-schedules/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus jadwal kerja berdasarkan ID (admin only)
+      parameters:
+      - description: Work Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Jadwal kerja berhasil dihapus
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: ID jadwal kerja tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Jadwal tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal menghapus jadwal kerja
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete Work Schedule
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui jadwal kerja berdasarkan ID (admin only)
+      parameters:
+      - description: Work Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update jadwal kerja
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/models.WorkScheduleUpdatePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Jadwal kerja berhasil diperbarui
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: ID tidak valid atau validasi gagal
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Jadwal tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal memperbarui jadwal kerja
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update Work Schedule
+      tags:
+      - Admin
   /attendance/generate-qr:
     get:
       consumes:
@@ -774,6 +952,30 @@ paths:
       security:
       - BearerAuth: []
       summary: Get My Attendance History
+      tags:
+      - Attendance
+  /attendance/my-today:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data absensi hari ini untuk user yang sedang login
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Null jika belum ada absensi hari ini
+          schema:
+            type: object
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get My Today's Attendance
       tags:
       - Attendance
   /attendance/today:
@@ -971,6 +1173,96 @@ paths:
       summary: Get Department by ID
       tags:
       - Departments
+  /files/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil file dari GridFS berdasarkan file ID dan mengirimkannya
+        sebagai response
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: File berhasil diambil
+          schema:
+            type: file
+        "400":
+          description: Format File ID tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: File tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengakses atau membaca file
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get File from GridFS by ID
+      tags:
+      - Files
+  /files/by-name/{filename}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil file dari GridFS berdasarkan nama file dan mengirimkannya
+        sebagai response
+      parameters:
+      - description: Filename
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: File berhasil diambil
+          schema:
+            type: file
+        "400":
+          description: Nama file tidak boleh kosong
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: File tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengakses atau membaca file
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get File from GridFS by Filename
+      tags:
+      - Files
   /leave-requests:
     get:
       consumes:
@@ -999,38 +1291,67 @@ paths:
       - Admin
     post:
       consumes:
-      - application/json
-      description: Membuat pengajuan izin/cuti/sakit baru
+      - multipart/form-data
+      description: Membuat pengajuan cuti atau sakit baru. Untuk 'Cuti', hanya bisa
+        satu tanggal per pengajuan dan dibatasi 12 kali setahun. Untuk 'Sakit', bisa
+        rentang tanggal.
       parameters:
-      - description: Data pengajuan izin
-        in: body
-        name: payload
+      - description: Jenis Pengajuan (Cuti, Sakit)
+        enum:
+        - Cuti
+        - Sakit
+        in: formData
+        name: request_type
         required: true
-        schema:
-          $ref: '#/definitions/models.LeaveRequestCreatePayload'
+        type: string
+      - description: Tanggal Mulai (YYYY-MM-DD)
+        in: formData
+        name: start_date
+        required: true
+        type: string
+      - description: Tanggal Selesai (YYYY-MM-DD)
+        in: formData
+        name: end_date
+        required: true
+        type: string
+      - description: Alasan Pengajuan
+        in: formData
+        name: reason
+        required: true
+        type: string
+      - description: Lampiran (Wajib untuk Sakit, maks 2MB)
+        in: formData
+        name: attachment
+        type: file
       produces:
       - application/json
       responses:
         "201":
-          description: Pengajuan berhasil dibuat
+          description: Pengajuan berhasil dikirim
           schema:
-            $ref: '#/definitions/models.LeaveRequest'
+            properties:
+              ' request':
+                $ref: '#/definitions/models.LeaveRequest'
+              message:
+                type: string
+            type: object
         "400":
-          description: Payload tidak valid
+          description: Input tidak valid
           schema:
             properties:
               error:
                 type: string
             type: object
-        "401":
-          description: Tidak terautentikasi
+        "403":
+          description: 'Akses ditolak (misal: sudah mencapai batas tahunan cuti, atau
+            sudah ada pengajuan di tanggal tersebut)'
           schema:
             properties:
               error:
                 type: string
             type: object
         "500":
-          description: Gagal membuat pengajuan
+          description: Kesalahan server internal
           schema:
             properties:
               error:
@@ -1175,6 +1496,43 @@ paths:
       summary: Get Leave Requests for current user
       tags:
       - Leave Request
+  /leave-requests/summary:
+    get:
+      consumes:
+      - application/json
+      - application/json
+      description: |-
+        Mengambil ringkasan jumlah pengajuan cuti (per bulan dan per tahun) untuk karyawan yang sedang login.
+        Mengambil ringkasan jumlah pengajuan cuti (per tahun) untuk karyawan yang sedang login.
+      produces:
+      - application/json
+      - application/json
+      responses:
+        "200":
+          description: Ringkasan pengajuan cuti berhasil diambil
+          schema:
+            $ref: '#/definitions/models.LeaveSummaryResponse'
+        "401":
+          description: Tidak terautentikasi
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil ringkasan pengajuan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      summary: Get Leave Request Summary for current user
+      tags:
+      - Leave Request
+      - Leave Request
   /users/{id}:
     get:
       consumes:
@@ -1238,7 +1596,7 @@ paths:
       consumes:
       - application/json
       description: Update data user (user hanya bisa update data diri sendiri, admin
-        bisa update semua)
+        bisa update semua, karyawan sekarang bisa mengubah email sendiri)
       parameters:
       - description: User ID
         in: path
@@ -1301,6 +1659,58 @@ paths:
       security:
       - BearerAuth: []
       summary: Update User
+      tags:
+      - Users
+  /users/{id}/photo:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil foto profil user berdasarkan ID. Jika tidak ada foto,
+        akan redirect ke placeholder
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      - image/png
+      - image/gif
+      - image/webp
+      responses:
+        "200":
+          description: Foto profil berhasil diambil
+          schema:
+            type: file
+        "307":
+          description: Redirect ke placeholder image
+          schema:
+            type: string
+        "400":
+          description: ID user tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: User tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil foto profil
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get User Profile Photo
       tags:
       - Users
   /users/{id}/upload-photo:
@@ -1422,6 +1832,128 @@ paths:
       summary: Change Password
       tags:
       - Auth
+  /work-schedules:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua jadwal kerja dalam rentang tanggal tertentu dengan
+        filter hari libur
+      parameters:
+      - description: Tanggal mulai (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: Tanggal selesai (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar jadwal kerja berhasil diambil
+          schema:
+            properties:
+              data:
+                type: array
+            type: object
+        "400":
+          description: Format tanggal tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil jadwal kerja
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get All Work Schedules
+      tags:
+      - Work Schedule
+  /work-schedules/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil detail jadwal kerja berdasarkan ID
+      parameters:
+      - description: Work Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Jadwal kerja berhasil diambil
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/models.WorkSchedule'
+            type: object
+        "400":
+          description: ID jadwal kerja tidak valid
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Jadwal kerja tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal mengambil jadwal kerja
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Work Schedule by ID
+      tags:
+      - Work Schedule
+  /work-schedules/holidays:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar hari libur nasional untuk tahun tertentu
+      parameters:
+      - description: 'Tahun (default: tahun sekarang)'
+        in: query
+        name: year
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data hari libur berhasil diambil
+          schema:
+            type: object
+        "500":
+          description: Gagal mengambil data hari libur
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Holidays
+      tags:
+      - Work Schedule
 schemes:
 - http
 - https

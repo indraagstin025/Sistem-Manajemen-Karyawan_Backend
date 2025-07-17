@@ -278,6 +278,17 @@ func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
 }
 
 // Tambahkan fungsi ini di attendance_handler.go
+// GetMyTodayAttendance godoc
+// @Summary Get My Today's Attendance
+// @Description Mengambil data absensi hari ini untuk user yang sedang login
+// @Tags Attendance
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.Attendance "Data absensi hari ini berhasil diambil"
+// @Success 200 {object} object "Null jika belum ada absensi hari ini"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Router /attendance/my-today [get]
 func (h *AttendanceHandler) GetMyTodayAttendance(c *fiber.Ctx) error {
 	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
