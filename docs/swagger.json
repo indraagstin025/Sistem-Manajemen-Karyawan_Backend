@@ -1002,6 +1002,105 @@
                 }
             }
         },
+        "/attendance/scan": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Melakukan scan QR code untuk proses check-in atau check-out karyawan",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Attendance"
+                ],
+                "summary": "Scan QR Code untuk Check-in/Check-out",
+                "parameters": [
+                    {
+                        "description": "Data QR Code scan",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.QRCodeScanPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil check-in/check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Berhasil check-in",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Payload tidak valid atau QR Code bermasalah",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "QR Code tidak ditemukan",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Sudah melakukan check-in dan check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Gagal melakukan check-in/check-out",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/attendance/today": {
             "get": {
                 "security": [
@@ -2804,6 +2903,21 @@
                 },
                 "current_month_leave_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "models.QRCodeScanPayload": {
+            "type": "object",
+            "required": [
+                "qr_code_value",
+                "user_id"
+            ],
+            "properties": {
+                "qr_code_value": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },

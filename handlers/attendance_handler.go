@@ -45,8 +45,6 @@ func NewAttendanceHandler(repo repository.AttendanceRepository, workScheduleRepo
 // @Failure 500 {object} object{error=string} "Gagal melakukan check-in/check-out"
 // @Router /attendance/scan [post]
 // handlers/attendance_handler.go
-
-
 // file: handlers/attendance_handler.go
 func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	var payload models.QRCodeScanPayload

@@ -190,6 +190,16 @@ definitions:
       current_month_leave_count:
         type: integer
     type: object
+  models.QRCodeScanPayload:
+    properties:
+      qr_code_value:
+        type: string
+      user_id:
+        type: string
+    required:
+    - qr_code_value
+    - user_id
+    type: object
   models.User:
     properties:
       address:
@@ -976,6 +986,68 @@ paths:
       security:
       - BearerAuth: []
       summary: Get My Today's Attendance
+      tags:
+      - Attendance
+  /attendance/scan:
+    post:
+      consumes:
+      - application/json
+      description: Melakukan scan QR code untuk proses check-in atau check-out karyawan
+      parameters:
+      - description: Data QR Code scan
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/models.QRCodeScanPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil check-in/check-out
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "201":
+          description: Berhasil check-in
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Payload tidak valid atau QR Code bermasalah
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: QR Code tidak ditemukan
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "409":
+          description: Sudah melakukan check-in dan check-out
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Gagal melakukan check-in/check-out
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Scan QR Code untuk Check-in/Check-out
       tags:
       - Attendance
   /attendance/today:
