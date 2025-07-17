@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"Sistem-Manajemen-Karyawan/config"
-	"bytes" 
+	"bytes"
 	"io"
 	"log"
 	"net/http"
@@ -11,9 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-
 type FileHandler struct {
-	
 }
 
 // NewFileHandler adalah "konstruktor" untuk membuat FileHandler.
@@ -59,7 +57,7 @@ func (h *FileHandler) GetFileFromGridFS(c *fiber.Ctx) error {
 		log.Printf("ERROR: Gagal membaca file dari GridFS ke buffer: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca data file"})
 	}
-	
+
 	fileInfo := downloadStream.GetFile()
 
 	contentType := http.DetectContentType(buf.Bytes())
@@ -69,7 +67,6 @@ func (h *FileHandler) GetFileFromGridFS(c *fiber.Ctx) error {
 
 	return c.Send(buf.Bytes())
 }
-
 
 // GetFileByFilename godoc
 // @Summary Get File from GridFS by Filename

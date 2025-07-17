@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"context" 
+	"context"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -13,21 +13,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"Sistem-Manajemen-Karyawan/models"
-	"Sistem-Manajemen-Karyawan/repository" 
+	"Sistem-Manajemen-Karyawan/repository"
 )
 
 type AttendanceHandler struct {
-	repo repository.AttendanceRepository
+	repo             repository.AttendanceRepository
 	workScheduleRepo *repository.WorkScheduleRepository
 }
 
 func NewAttendanceHandler(repo repository.AttendanceRepository, workScheduleRepo *repository.WorkScheduleRepository) *AttendanceHandler {
 	return &AttendanceHandler{
-		repo: repo,
+		repo:             repo,
 		workScheduleRepo: workScheduleRepo,
 	}
-	
-	
+
 }
 
 // ScanQRCode godoc
@@ -47,10 +46,8 @@ func NewAttendanceHandler(repo repository.AttendanceRepository, workScheduleRepo
 // @Router /attendance/scan [post]
 // handlers/attendance_handler.go
 
-// handlers/attendance_handler.go
 
 // file: handlers/attendance_handler.go
-
 func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 	var payload models.QRCodeScanPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -84,7 +81,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
 
-    // -- BARIS TYPE ASSERTION YANG KEMARIN KITA TAMBAHKAN, SEKARANG DIHAPUS --
+	// -- BARIS TYPE ASSERTION YANG KEMARIN KITA TAMBAHKAN, SEKARANG DIHAPUS --
 
 	// 4. Logika perbandingan waktu
 	scheduledStartTime, _ := time.ParseInLocation("15:04", todaysSchedule.StartTime, wib)
@@ -135,7 +132,7 @@ func (h *AttendanceHandler) ScanQRCode(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal membuat QR Code"
 // @Router /attendance/generate-qr [get]
 func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
-	const QR_CODE_DURATION = 30 * time.Second 
+	const QR_CODE_DURATION = 30 * time.Second
 
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
@@ -144,11 +141,10 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 	currentTimeInWIB := time.Now().In(wib)
 	todayStr := currentTimeInWIB.Format("2006-01-02")
 
-
 	existingQRCode, err := h.repo.FindActiveQRCodeByDate(ctx, todayStr)
 
 	if err == nil && existingQRCode != nil && currentTimeInWIB.Before(existingQRCode.ExpiresAt) {
-	
+
 		png, err := qrcode.Encode(existingQRCode.Code, qrcode.Medium, 256)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal re-encode gambar QR Code yang sudah ada."})
@@ -162,17 +158,16 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 		})
 	}
 
-
 	uniqueCode := uuid.New().String()
-	expiresAt := currentTimeInWIB.Add(QR_CODE_DURATION) 
+	expiresAt := currentTimeInWIB.Add(QR_CODE_DURATION)
 
 	newQRCode := &models.QRCode{
 		ID:        primitive.NewObjectID(),
 		Code:      uniqueCode,
-		Date:      todayStr, 
+		Date:      todayStr,
 		ExpiresAt: expiresAt,
-		CreatedAt: currentTimeInWIB, 
-		UpdatedAt: currentTimeInWIB, 
+		CreatedAt: currentTimeInWIB,
+		UpdatedAt: currentTimeInWIB,
 	}
 
 	_, err = h.repo.CreateQRCode(ctx, newQRCode)
@@ -194,7 +189,6 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 		"qr_code_value": uniqueCode,
 	})
 }
-
 
 // Di attendance_handler.go
 
@@ -244,9 +238,8 @@ func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
 		filter["user_id"] = objID
 	}
 
-
 	if startDateStr != "" && endDateStr != "" {
-		
+
 		filter["date"] = bson.M{
 			"$gte": startDateStr,
 			"$lte": endDateStr,
@@ -296,9 +289,8 @@ func (h *AttendanceHandler) GetMyTodayAttendance(c *fiber.Ctx) error {
 	}
 
 	wib, _ := time.LoadLocation("Asia/Jakarta")
-today := time.Now().In(wib).Format("2006-01-02")
+	today := time.Now().In(wib).Format("2006-01-02")
 
-	
 	attendance, err := h.repo.FindAttendanceByUserAndDate(c.Context(), claims.UserID, today)
 	if err != nil {
 		return c.Status(fiber.StatusOK).JSON(nil)

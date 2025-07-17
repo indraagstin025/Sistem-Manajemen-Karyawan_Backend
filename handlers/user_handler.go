@@ -5,14 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"	
+	"log"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo" 
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
@@ -21,9 +21,9 @@ import (
 )
 
 type UserHandler struct {
-	userRepo   *repository.UserRepository
-	deptRepo   repository.DepartmentRepository    
-	leaveRepo  repository.LeaveRequestRepository  
+	userRepo  *repository.UserRepository
+	deptRepo  repository.DepartmentRepository
+	leaveRepo repository.LeaveRequestRepository
 }
 
 // Perbarui konstruktor untuk menginisialisasi semua repository yang dibutuhkan.
@@ -31,14 +31,14 @@ type UserHandler struct {
 // repository di file main.go Anda.
 func NewUserHandler(
 	userRepo *repository.UserRepository,
-	deptRepo repository.DepartmentRepository,     
-	leaveRepo repository.LeaveRequestRepository,  
-	
+	deptRepo repository.DepartmentRepository,
+	leaveRepo repository.LeaveRequestRepository,
+
 ) *UserHandler {
 	return &UserHandler{
-		userRepo:   userRepo,
-		deptRepo:   deptRepo,   
-		leaveRepo:  leaveRepo,  
+		userRepo:  userRepo,
+		deptRepo:  deptRepo,
+		leaveRepo: leaveRepo,
 	}
 }
 
@@ -58,45 +58,42 @@ func NewUserHandler(
 // @Failure 500 {object} object{error=string} "Internal server error"
 // @Router /users/{id} [get]
 func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
-    idParam := c.Params("id")
-    objID, err := primitive.ObjectIDFromHex(idParam)
-    if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
-    }
+	idParam := c.Params("id")
+	objID, err := primitive.ObjectIDFromHex(idParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "format ID user tidak valid"})
+	}
 
-    claims, ok := c.Locals("user").(*models.Claims)
-    if !ok {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
-    }
+	claims, ok := c.Locals("user").(*models.Claims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "tidak terautentikasi atau klaim token tidak valid"})
+	}
 
-    if claims.Role != "admin" && claims.UserID.Hex() != idParam {
-        return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat melihat profile anda sendiri."})
-    }
+	if claims.Role != "admin" && claims.UserID.Hex() != idParam {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "akses ditolak. anda hanya dapat melihat profile anda sendiri."})
+	}
 
-    ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
 
-    user, err := h.userRepo.FindUserByID(ctx, objID) 
+	user, err := h.userRepo.FindUserByID(ctx, objID)
 
-    
-    if user == nil {
-        if err == nil || err == mongo.ErrNoDocuments { 
-            return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
-        }
-        
-        log.Printf("ERROR: FindUserByID mengembalikan user nil dengan error: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal mendapatkan user (data kosong atau error repo)."})
-    }
-   
+	if user == nil {
+		if err == nil || err == mongo.ErrNoDocuments {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user tidak ditemukan"})
+		}
 
+		log.Printf("ERROR: FindUserByID mengembalikan user nil dengan error: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "gagal mendapatkan user (data kosong atau error repo)."})
+	}
 
-    if err != nil { 
-        log.Printf("Error getting user by ID: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
-    }
+	if err != nil {
+		log.Printf("Error getting user by ID: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fmt.Sprintf("gagal mendapatkan user: %v", err)})
+	}
 
-    user.Password = "" 
-    return c.Status(fiber.StatusOK).JSON(user)
+	user.Password = ""
+	return c.Status(fiber.StatusOK).JSON(user)
 }
 
 // GetAllUsers godoc
@@ -213,7 +210,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		if payload.Address != "" {
 			updateData["address"] = payload.Address
 		}
-		
+
 		// Izinkan karyawan untuk mengubah email mereka sendiri, dengan validasi keunikan
 		if payload.Email != "" {
 			isEmailTaken, err := h.userRepo.IsEmailTaken(ctx, payload.Email, objID)
@@ -329,85 +326,85 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal mengambil statistik dashboard"
 // @Router /admin/dashboard-stats [get]
 func (h *UserHandler) GetDashboardStats(c *fiber.Ctx) error {
-    ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second) // Tambahkan timeout yang cukup
-    defer cancel()
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second) // Tambahkan timeout yang cukup
+	defer cancel()
 
-    totalUsers, err := h.userRepo.CountDocuments(ctx, bson.M{})
-    if err != nil {
-        log.Printf("Error menghitung total user: %v", err) // Log error
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total user."})
-    }
+	totalUsers, err := h.userRepo.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		log.Printf("Error menghitung total user: %v", err) // Log error
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total user."})
+	}
 
-    activeUsers, err := h.userRepo.CountDocuments(ctx, bson.M{"role": "karyawan"})
-    if err != nil {
-        log.Printf("Error menghitung karyawan aktif: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung karyawan aktif."})
-    }
+	activeUsers, err := h.userRepo.CountDocuments(ctx, bson.M{"role": "karyawan"})
+	if err != nil {
+		log.Printf("Error menghitung karyawan aktif: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung karyawan aktif."})
+	}
 
-    karyawanCuti := int64(0) 
+	karyawanCuti := int64(0)
 
-    pendingLeavesCount, err := h.leaveRepo.CountPendingRequests(ctx)
-    if err != nil {
-        log.Printf("Error menghitung pengajuan tertunda: %v", err)
-        pendingLeavesCount = 0 
-    }
+	pendingLeavesCount, err := h.leaveRepo.CountPendingRequests(ctx)
+	if err != nil {
+		log.Printf("Error menghitung pengajuan tertunda: %v", err)
+		pendingLeavesCount = 0
+	}
 
-    thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
-    newPositions, err := h.userRepo.CountDocuments(ctx, bson.M{"created_at": bson.M{"$gte": thirtyDaysAgo}})
-    if err != nil {
-        log.Printf("Error menghitung posisi baru: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung posisi baru."})
-    }
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	newPositions, err := h.userRepo.CountDocuments(ctx, bson.M{"created_at": bson.M{"$gte": thirtyDaysAgo}})
+	if err != nil {
+		log.Printf("Error menghitung posisi baru: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung posisi baru."})
+	}
 
-    totalDepartemen, err := h.deptRepo.CountDocuments(ctx, bson.M{}) 
-    if err != nil {
-        log.Printf("Error menghitung total departemen: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total departemen."})
-    }
+	totalDepartemen, err := h.deptRepo.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		log.Printf("Error menghitung total departemen: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghitung total departemen."})
+	}
 
-    pipeline := mongo.Pipeline{ 
-        bson.D{{Key: "$match", Value: bson.D{{Key: "department", Value: bson.D{{Key: "$ne", Value: ""}}}}}},
-        bson.D{{Key: "$group", Value: bson.D{
-            {Key: "_id",    Value: "$department"},
-            {Key: "count",  Value: bson.D{{Key: "$sum", Value: 1}}},
-        }}},
-        bson.D{{Key: "$project", Value: bson.D{
-            {Key: "department", Value: "$_id"},
-            {Key: "count",      Value: 1},
-            {Key: "_id",        Value: 0},
-        }}},
-    }
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.D{{Key: "department", Value: bson.D{{Key: "$ne", Value: ""}}}}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$department"},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "department", Value: "$_id"},
+			{Key: "count", Value: 1},
+			{Key: "_id", Value: 0},
+		}}},
+	}
 
-    cursor, err := h.userRepo.Aggregate(ctx, pipeline)
-    if err != nil {
-        log.Printf("Error melakukan agregasi distribusi departemen: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan agregasi distribusi departemen."})
-    }
-    defer cursor.Close(ctx)
+	cursor, err := h.userRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Printf("Error melakukan agregasi distribusi departemen: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal melakukan agregasi distribusi departemen."})
+	}
+	defer cursor.Close(ctx)
 
-    var departmentDistribution []models.DepartmentCount
-    if err = cursor.All(ctx, &departmentDistribution); err != nil {
-        log.Printf("Error mendecode distribusi departemen: %v", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mendecode distribusi departemen."})
-    }
+	var departmentDistribution []models.DepartmentCount
+	if err = cursor.All(ctx, &departmentDistribution); err != nil {
+		log.Printf("Error mendecode distribusi departemen: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mendecode distribusi departemen."})
+	}
 
-    latestActivities := []string{
-        "Sistem HR-System dimulai.",
-        "Admin login ke dashboard.",
-    }
+	latestActivities := []string{
+		"Sistem HR-System dimulai.",
+		"Admin login ke dashboard.",
+	}
 
-    stats := &models.DashboardStats{
-        TotalKaryawan:             totalUsers,
-        KaryawanAktif:             activeUsers,
-        KaryawanCuti:              karyawanCuti,
-        PendingLeaveRequestsCount: pendingLeavesCount,
-        PosisiBaru:                newPositions,
-        TotalDepartemen:           totalDepartemen,
-        DistribusiDepartemen:      departmentDistribution,
-        AktivitasTerbaru:          latestActivities,
-    }
+	stats := &models.DashboardStats{
+		TotalKaryawan:             totalUsers,
+		KaryawanAktif:             activeUsers,
+		KaryawanCuti:              karyawanCuti,
+		PendingLeaveRequestsCount: pendingLeavesCount,
+		PosisiBaru:                newPositions,
+		TotalDepartemen:           totalDepartemen,
+		DistribusiDepartemen:      departmentDistribution,
+		AktivitasTerbaru:          latestActivities,
+	}
 
-    return c.Status(fiber.StatusOK).JSON(stats)
+	return c.Status(fiber.StatusOK).JSON(stats)
 }
 
 // UploadProfilePhoto godoc
@@ -561,7 +558,6 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 		return c.Redirect(placeholderURL, fiber.StatusTemporaryRedirect)
 	}
 
-
 	bucket, err := config.GetGridFSBucket()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses GridFS"})
@@ -581,4 +577,3 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 
 	return c.Send(buf.Bytes())
 }
-
