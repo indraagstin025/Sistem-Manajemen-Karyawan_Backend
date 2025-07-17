@@ -31,7 +31,7 @@ func NewLeaveRequestHandler(leaveRepo repository.LeaveRequestRepository, attenda
 
 // CreateLeaveRequest godoc
 // @Summary Create Leave Request
-// @Description Membuat pengajuan cuti atau sakit baru.
+// @Description Membuat pengajuan cuti atau sakit baru. Untuk 'Cuti', hanya bisa satu tanggal per pengajuan dan dibatasi 12 kali setahun. Untuk 'Sakit', bisa rentang tanggal.
 // @Tags Leave Request
 // @Accept multipart/form-data
 // @Produce json
@@ -43,7 +43,7 @@ func NewLeaveRequestHandler(leaveRepo repository.LeaveRequestRepository, attenda
 // @Param attachment formData file false "Lampiran (Wajib untuk Sakit, maks 2MB)"
 // @Success 201 {object} object{message=string, request=models.LeaveRequest} "Pengajuan berhasil dikirim"
 // @Failure 400 {object} object{error=string} "Input tidak valid"
-// @Failure 403 {object} object{error=string} "Akses ditolak (misal: sudah mengajukan cuti bulan ini)"
+// @Failure 403 {object} object{error=string} "Akses ditolak (misal: sudah mencapai batas tahunan cuti, atau sudah ada pengajuan di tanggal tersebut)"
 // @Failure 500 {object} object{error=string} "Kesalahan server internal"
 // @Router /leave-requests [post]
 func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
@@ -69,60 +69,69 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format tanggal mulai tidak valid. Gunakan YYYY-MM-DD."})
 	}
+	parsedEndDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format tanggal selesai tidak valid. Gunakan YYYY-MM-DD."})
+	}
+	if parsedStartDate.After(parsedEndDate) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Tanggal selesai tidak boleh sebelum tanggal mulai."})
+	}
 
-	// Hanya terapkan batasan ini untuk jenis pengajuan "Cuti"
+	// --- Logika Khusus berdasarkan Jenis Pengajuan ---
 	if requestType == "Cuti" {
-		currentMonth := parsedStartDate.Month()
-		currentYear := parsedStartDate.Year()
+		// Validasi 1: Untuk 'Cuti', tanggal mulai dan selesai harus sama (1 hari per pengajuan)
+		if startDateStr != endDateStr {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Untuk pengajuan 'Cuti', tanggal mulai dan tanggal selesai harus sama (1 hari per pengajuan).",
+			})
+		}
 
-		// --- LOGIKA BARU: BATASAN 12 KALI PER TAHUN ---
-		// PENTING: Pastikan ini menghitung jumlah dokumen (pengajuan) bukan durasi hari.
-		annualLeaveCount, err := h.leaveRepo.CountByUserIDYearAndType(c.Context(), claims.UserID, currentYear, requestType)
+		// Validasi 2: Cek Duplikasi Pengajuan Cuti di tanggal yang sama (penting!)
+		// Menggunakan FindByUserAndDateAndType karena ia bisa mengecek tumpang tindih untuk satu tanggal.
+		existingCutiOnDate, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, startDateStr, "Cuti")
+		if err != nil && err != mongo.ErrNoDocuments {
+			log.Printf("ERROR: Gagal memeriksa duplikasi pengajuan Cuti di tanggal %s untuk user %s: %v", startDateStr, claims.UserID.Hex(), err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa duplikasi pengajuan Cuti."})
+		}
+		if existingCutiOnDate != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": fmt.Sprintf("Anda sudah memiliki pengajuan 'Cuti' (pending/disetujui) untuk tanggal %s. Setiap pengajuan cuti hanya untuk satu tanggal.", startDateStr),
+			})
+		}
+
+		// Validasi 3: Cek Batasan Tahunan Cuti (Maksimal 12 kali per tahun)
+		currentYear := parsedStartDate.Year()
+		annualLeaveCount, err := h.leaveRepo.CountByUserIDYearAndType(c.Context(), claims.UserID, currentYear, "Cuti")
 		if err != nil {
 			log.Printf("ERROR: Gagal memeriksa jumlah pengajuan Cuti tahunan untuk user %s di tahun %d: %v", claims.UserID.Hex(), currentYear, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti tahunan."})
 		}
-		if annualLeaveCount >= 12 { // Jika sudah 12 kali pengajuan (bukan hari)
+		if annualLeaveCount >= 12 {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": fmt.Sprintf("Anda telah mencapai batas maksimal 12 kali pengajuan 'Cuti' untuk tahun %d ini.", currentYear),
 			})
 		}
-		// --- AKHIR BATASAN TAHUNAN ---
 
-		// --- LOGIKA YANG SUDAH ADA: BATASAN 1 KALI PER BULAN ---
-		existingCount, err := h.leaveRepo.CountByUserIDMonthAndType(c.Context(), claims.UserID, currentYear, currentMonth, requestType)
-		if err != nil {
-			log.Printf("ERROR: Gagal memeriksa jumlah pengajuan Cuti untuk user %s di bulan %s %d: %v", claims.UserID.Hex(), currentMonth, currentYear, err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti."})
-		}
-		if existingCount > 0 { // Jika sudah ada 1 pengajuan cuti di bulan ini
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": fmt.Sprintf("Anda hanya dapat mengajukan 'Cuti' satu kali dalam bulan %s %d.", currentMonth.String(), currentYear),
-			})
-		}
-	}
-
-	// Logika pengecekan duplikasi untuk Sakit (bisa dipertahankan jika relevan)
-	if requestType == "Sakit" {
-		startDate, _ := time.Parse("2006-01-02", startDateStr)
-		endDate, _ := time.Parse("2006-01-02", endDateStr)
-
-		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+	} else if requestType == "Sakit" {
+		// Validasi: Cek tumpang tindih tanggal untuk pengajuan Sakit (bisa rentang tanggal)
+		for d := parsedStartDate; !d.After(parsedEndDate); d = d.AddDate(0, 0, 1) {
 			dateStr := d.Format("2006-01-02")
-			existing, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, dateStr, requestType)
+			existingSakitOnDate, err := h.leaveRepo.FindByUserAndDateAndType(c.Context(), claims.UserID, dateStr, "Sakit")
 			if err != nil && err != mongo.ErrNoDocuments {
+				log.Printf("ERROR: Gagal memeriksa tumpang tindih pengajuan Sakit di tanggal %s untuk user %s: %v", dateStr, claims.UserID.Hex(), err)
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Gagal memeriksa pengajuan sebelumnya",
+					"error": "Gagal memeriksa pengajuan Sakit sebelumnya.",
 				})
 			}
-			if existing != nil {
+			if existingSakitOnDate != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-					"error": fmt.Sprintf("Anda sudah mengajukan %s untuk tanggal %s.", requestType, dateStr),
+					"error": fmt.Sprintf("Anda sudah memiliki pengajuan 'Sakit' (pending/disetujui) yang tumpang tindih untuk tanggal %s.", dateStr),
 				})
 			}
 		}
 	}
 
+	// --- Logika Lampiran (wajib untuk Sakit) ---
 	var attachmentURL string
 	file, err := c.FormFile("attachment")
 	if err == nil && file != nil {
@@ -160,13 +169,14 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Lampiran wajib untuk pengajuan Sakit"})
 	}
 
+	// --- Buat dan Simpan Pengajuan ---
 	newRequest := &models.LeaveRequest{
 		ID:            primitive.NewObjectID(),
 		UserID:        claims.UserID,
 		StartDate:     startDateStr,
-		EndDate:       endDateStr,
+		EndDate:       endDateStr, // EndDate tetap disimpan, bahkan jika sama dengan StartDate untuk Cuti
 		Reason:        reason,
-		Status:        "pending", // Status awal selalu 'pending'
+		Status:        "pending",
 		RequestType:   requestType,
 		AttachmentURL: attachmentURL,
 		CreatedAt:     time.Now(),
@@ -477,41 +487,35 @@ func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
 // @Failure 401 {object} object{error=string} "Tidak terautentikasi"
 // @Failure 500 {object} object{error=string} "Gagal mengambil ringkasan pengajuan"
 // @Router /leave-requests/summary [get]
+// GetLeaveSummary godoc
+// @Summary Get Leave Request Summary for current user
+// @Description Mengambil ringkasan jumlah pengajuan cuti (per tahun) untuk karyawan yang sedang login.
+// @Tags Leave Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.LeaveSummaryResponse "Ringkasan pengajuan cuti berhasil diambil"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 500 {object} object{error=string} "Gagal mengambil ringkasan pengajuan"
+// @Router /leave-requests/summary [get]
 func (h *LeaveRequestHandler) GetLeaveSummary(c *fiber.Ctx) error {
-	// Pastikan user sudah login dan klaim token valid
 	claims, ok := c.Locals("user").(*models.Claims)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid atau sesi rusak"})
 	}
 
-	// Dapatkan tahun dan bulan saat ini
 	currentYear := time.Now().Year()
-	currentMonth := time.Now().Month()
-
-	// Hitung pengajuan cuti untuk bulan ini
-	// Panggil fungsi CountByUserIDMonthAndType dari repository Anda
-	// Hanya hitung pengajuan dengan RequestType "Cuti"
-	monthlyCount, err := h.leaveRepo.CountByUserIDMonthAndType(c.Context(), claims.UserID, currentYear, currentMonth, "Cuti")
-	if err != nil {
-		log.Printf("ERROR: Gagal menghitung cuti bulanan untuk user %s: %v", claims.UserID.Hex(), err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil ringkasan cuti bulanan."})
-	}
-
-	// Hitung pengajuan cuti untuk tahun ini
-	// Panggil fungsi CountByUserIDYearAndType dari repository Anda
-	// Hanya hitung pengajuan dengan RequestType "Cuti"
+	monthlyCount := int64(0) 
 	annualCount, err := h.leaveRepo.CountByUserIDYearAndType(c.Context(), claims.UserID, currentYear, "Cuti")
 	if err != nil {
 		log.Printf("ERROR: Gagal menghitung cuti tahunan untuk user %s: %v", claims.UserID.Hex(), err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil ringkasan cuti tahunan."})
 	}
 
-	// Buat respons menggunakan struct LeaveSummaryResponse
 	response := models.LeaveSummaryResponse{
-		CurrentMonthLeaveCount: monthlyCount,
+		CurrentMonthLeaveCount: monthlyCount, 
 		AnnualLeaveCount:       annualCount,
 	}
 
-	// Kirim respons JSON
 	return c.Status(fiber.StatusOK).JSON(response)
 }

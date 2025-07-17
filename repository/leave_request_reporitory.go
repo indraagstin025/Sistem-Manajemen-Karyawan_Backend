@@ -149,10 +149,13 @@ func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, u
 	filter := bson.M{
 		"user_id":      userID,
 		"request_type": requestType,
+		"status":       bson.M{"$in": []string{"pending", "approved"}}, // Hanya cek yang belum ditolak
 		"$or": []bson.M{
-			{"start_date": date}, 
-			{"end_date": date},   
-			{ 
+			// Kasus 1: Tanggal mulai atau selesai pengajuan adalah tanggal yang dicari
+			{"start_date": date},
+			{"end_date": date},
+			// Kasus 2: Tanggal yang dicari berada di dalam rentang pengajuan (inklusif)
+			{
 				"start_date": bson.M{"$lte": date},
 				"end_date":   bson.M{"$gte": date},
 			},
@@ -163,12 +166,14 @@ func (r *leaveRequestRepository) FindByUserAndDateAndType(ctx context.Context, u
 	err := r.collection.FindOne(ctx, filter).Decode(&result)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
+			// Tidak ditemukan dokumen adalah bukan error, kembalikan nil
 			return nil, nil
 		}
 		return nil, fmt.Errorf("gagal mencari pengajuan berdasarkan user, tanggal, dan jenis: %w", err)
 	}
 	return &result, nil
 }
+
 
 
 
@@ -212,18 +217,18 @@ func (r *leaveRequestRepository) CountPendingRequests(ctx context.Context) (int6
 
 
 func (r *leaveRequestRepository) CountByUserIDMonthAndType(ctx context.Context, userID primitive.ObjectID, year int, month time.Month, requestType string) (int64, error) {
-	
 	startDateOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 	endDateOfMonth := startDateOfMonth.AddDate(0, 1, 0).Add(-time.Nanosecond)
 
-	
 	filter := bson.M{
 		"user_id":      userID,
 		"request_type": requestType,
+		"status":       bson.M{"$in": []string{"pending", "approved"}},
 		"$or": []bson.M{
 			{"start_date": bson.M{"$gte": startDateOfMonth.Format("2006-01-02"), "$lte": endDateOfMonth.Format("2006-01-02")}},
 			{"end_date": bson.M{"$gte": startDateOfMonth.Format("2006-01-02"), "$lte": endDateOfMonth.Format("2006-01-02")}},
-			{"start_date": bson.M{"$lte": startDateOfMonth.Format("2006-01-02")}, "end_date": bson.M{"$gte": endDateOfMonth.Format("2006-01-02")}},
+			// Perbaikan: Hapus koma setelah kurung kurawal penutup terakhir dari bson.M di dalam array $or.
+			{"start_date": bson.M{"$lte": startDateOfMonth.Format("2006-01-02"), "end_date": bson.M{"$gte": endDateOfMonth.Format("2006-01-02")}}},
 		},
 	}
 
@@ -235,30 +240,27 @@ func (r *leaveRequestRepository) CountByUserIDMonthAndType(ctx context.Context, 
 }
 
 func (r *leaveRequestRepository) CountByUserIDYearAndType(ctx context.Context, userID primitive.ObjectID, year int, requestType string) (int64, error) {
-    filter := bson.M{
-        "user_id":      userID,
-        "request_type": requestType,
-        "status": bson.M{ // Sesuaikan ini jika Anda hanya ingin menghitung yang "approved"
-            "$in": []string{"pending", "approved"},
-        },
-        "start_date": bson.M{
-            "$gte": fmt.Sprintf("%04d-01-01", year),
-            "$lte": fmt.Sprintf("%04d-12-31", year),
-        },
-    }
+	filter := bson.M{
+		"user_id":      userID,
+		"request_type": requestType,
+		"status":       bson.M{"$in": []string{"pending", "approved"}}, // Hanya hitung yang pending atau approved
+		// Filter berdasarkan rentang tanggal untuk tahun tertentu
+		"start_date": bson.M{
+			"$gte": fmt.Sprintf("%04d-01-01", year),
+			"$lte": fmt.Sprintf("%04d-12-31", year),
+		},
+	}
 
-    count, err := r.collection.CountDocuments(ctx, filter)
-    if err != nil {
-        return 0, fmt.Errorf("gagal menghitung pengajuan cuti tahunan: %w", err)
-    }
-    return count, nil
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("gagal menghitung pengajuan %s tahunan: %w", requestType, err)
+	}
+	return count, nil
 }
 
 func (r *leaveRequestRepository) FindApprovedRequestByUserAndDate(ctx context.Context, userID primitive.ObjectID, date string) (*models.LeaveRequest, error) {
 	var request models.LeaveRequest
-    
-    // Filter ini akan mencari dokumen di mana 'date' berada di antara
-    // 'start_date' dan 'end_date' (inklusif) dan statusnya "approved".
+
 	filter := bson.M{
 		"user_id":    userID,
 		"status":     "approved",
@@ -269,12 +271,10 @@ func (r *leaveRequestRepository) FindApprovedRequestByUserAndDate(ctx context.Co
 	err := r.collection.FindOne(ctx, filter).Decode(&request)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			// Tidak ditemukan itu bukan error, artinya user tidak sedang cuti/sakit.
-			return nil, nil
+			return nil, nil // Tidak ditemukan bukan error
 		}
 		return nil, fmt.Errorf("gagal mencari pengajuan yang disetujui: %w", err)
 	}
-    
 	return &request, nil
 }
 
