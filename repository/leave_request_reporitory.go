@@ -27,6 +27,7 @@ type LeaveRequestRepository interface {
 	FindByUserAndDateAndType(ctx context.Context, userID primitive.ObjectID, date string, requestType string) (*models.LeaveRequest, error)
 	CountByUserIDMonthAndType(ctx context.Context, userID primitive.ObjectID, year int, month time.Month, requestType string) (int64, error)
 	 FindApprovedRequestByUserAndDate(ctx context.Context, userID primitive.ObjectID, date string) (*models.LeaveRequest, error)
+	 CountByUserIDYearAndType(ctx context.Context, userID primitive.ObjectID, year int, requestType string) (int64, error)
 }
 
 type leaveRequestRepository struct {
@@ -233,6 +234,26 @@ func (r *leaveRequestRepository) CountByUserIDMonthAndType(ctx context.Context, 
 	return count, nil
 }
 
+func (r *leaveRequestRepository) CountByUserIDYearAndType(ctx context.Context, userID primitive.ObjectID, year int, requestType string) (int64, error) {
+    filter := bson.M{
+        "user_id":      userID,
+        "request_type": requestType,
+        "status": bson.M{ // Sesuaikan ini jika Anda hanya ingin menghitung yang "approved"
+            "$in": []string{"pending", "approved"},
+        },
+        "start_date": bson.M{
+            "$gte": fmt.Sprintf("%04d-01-01", year),
+            "$lte": fmt.Sprintf("%04d-12-31", year),
+        },
+    }
+
+    count, err := r.collection.CountDocuments(ctx, filter)
+    if err != nil {
+        return 0, fmt.Errorf("gagal menghitung pengajuan cuti tahunan: %w", err)
+    }
+    return count, nil
+}
+
 func (r *leaveRequestRepository) FindApprovedRequestByUserAndDate(ctx context.Context, userID primitive.ObjectID, date string) (*models.LeaveRequest, error) {
 	var request models.LeaveRequest
     
@@ -256,3 +277,4 @@ func (r *leaveRequestRepository) FindApprovedRequestByUserAndDate(ctx context.Co
     
 	return &request, nil
 }
+

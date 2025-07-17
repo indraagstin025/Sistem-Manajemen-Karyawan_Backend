@@ -61,7 +61,6 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan, tanggal mulai, tanggal selesai, dan alasan wajib diisi."})
 	}
 
-	// ✅ PERUBAHAN: Menambahkan validasi untuk memastikan hanya "Cuti" atau "Sakit" yang diterima.
 	if requestType != "Cuti" && requestType != "Sakit" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan tidak valid. Hanya 'Cuti' atau 'Sakit' yang diterima."})
 	}
@@ -71,24 +70,39 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format tanggal mulai tidak valid. Gunakan YYYY-MM-DD."})
 	}
 
-	// Logika untuk membatasi pengajuan Cuti satu kali per bulan (tetap dipertahankan)
+	// Hanya terapkan batasan ini untuk jenis pengajuan "Cuti"
 	if requestType == "Cuti" {
 		currentMonth := parsedStartDate.Month()
 		currentYear := parsedStartDate.Year()
 
+		// --- LOGIKA BARU: BATASAN 12 KALI PER TAHUN ---
+		// PENTING: Pastikan ini menghitung jumlah dokumen (pengajuan) bukan durasi hari.
+		annualLeaveCount, err := h.leaveRepo.CountByUserIDYearAndType(c.Context(), claims.UserID, currentYear, requestType)
+		if err != nil {
+			log.Printf("ERROR: Gagal memeriksa jumlah pengajuan Cuti tahunan untuk user %s di tahun %d: %v", claims.UserID.Hex(), currentYear, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti tahunan."})
+		}
+		if annualLeaveCount >= 12 { // Jika sudah 12 kali pengajuan (bukan hari)
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": fmt.Sprintf("Anda telah mencapai batas maksimal 12 kali pengajuan 'Cuti' untuk tahun %d ini.", currentYear),
+			})
+		}
+		// --- AKHIR BATASAN TAHUNAN ---
+
+		// --- LOGIKA YANG SUDAH ADA: BATASAN 1 KALI PER BULAN ---
 		existingCount, err := h.leaveRepo.CountByUserIDMonthAndType(c.Context(), claims.UserID, currentYear, currentMonth, requestType)
 		if err != nil {
 			log.Printf("ERROR: Gagal memeriksa jumlah pengajuan Cuti untuk user %s di bulan %s %d: %v", claims.UserID.Hex(), currentMonth, currentYear, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memeriksa batasan pengajuan Cuti."})
 		}
-		if existingCount > 0 {
+		if existingCount > 0 { // Jika sudah ada 1 pengajuan cuti di bulan ini
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": fmt.Sprintf("Anda hanya dapat mengajukan 'Cuti' satu kali dalam bulan %s %d.", currentMonth.String(), currentYear),
 			})
 		}
 	}
 
-	// Logika pengecekan duplikasi (bisa dipertimbangkan untuk dihapus jika pengecekan bulanan sudah cukup)
+	// Logika pengecekan duplikasi untuk Sakit (bisa dipertahankan jika relevan)
 	if requestType == "Sakit" {
 		startDate, _ := time.Parse("2006-01-02", startDateStr)
 		endDate, _ := time.Parse("2006-01-02", endDateStr)
@@ -108,10 +122,10 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			}
 		}
 	}
+
 	var attachmentURL string
 	file, err := c.FormFile("attachment")
 	if err == nil && file != nil {
-		// Logika upload file tetap sama
 		if file.Size > 2*1024*1024 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Ukuran file maksimal 2MB"})
 		}
@@ -152,7 +166,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		StartDate:     startDateStr,
 		EndDate:       endDateStr,
 		Reason:        reason,
-		Status:        "pending",
+		Status:        "pending", // Status awal selalu 'pending'
 		RequestType:   requestType,
 		AttachmentURL: attachmentURL,
 		CreatedAt:     time.Now(),
@@ -450,4 +464,54 @@ func (h *LeaveRequestHandler) UpdateLeaveRequestStatus(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Status pengajuan berhasil diperbarui",
 	})
+}
+
+// GetLeaveSummary godoc
+// @Summary Get Leave Request Summary for current user
+// @Description Mengambil ringkasan jumlah pengajuan cuti (per bulan dan per tahun) untuk karyawan yang sedang login.
+// @Tags Leave Request
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.LeaveSummaryResponse "Ringkasan pengajuan cuti berhasil diambil"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 500 {object} object{error=string} "Gagal mengambil ringkasan pengajuan"
+// @Router /leave-requests/summary [get]
+func (h *LeaveRequestHandler) GetLeaveSummary(c *fiber.Ctx) error {
+	// Pastikan user sudah login dan klaim token valid
+	claims, ok := c.Locals("user").(*models.Claims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Klaim token tidak valid atau sesi rusak"})
+	}
+
+	// Dapatkan tahun dan bulan saat ini
+	currentYear := time.Now().Year()
+	currentMonth := time.Now().Month()
+
+	// Hitung pengajuan cuti untuk bulan ini
+	// Panggil fungsi CountByUserIDMonthAndType dari repository Anda
+	// Hanya hitung pengajuan dengan RequestType "Cuti"
+	monthlyCount, err := h.leaveRepo.CountByUserIDMonthAndType(c.Context(), claims.UserID, currentYear, currentMonth, "Cuti")
+	if err != nil {
+		log.Printf("ERROR: Gagal menghitung cuti bulanan untuk user %s: %v", claims.UserID.Hex(), err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil ringkasan cuti bulanan."})
+	}
+
+	// Hitung pengajuan cuti untuk tahun ini
+	// Panggil fungsi CountByUserIDYearAndType dari repository Anda
+	// Hanya hitung pengajuan dengan RequestType "Cuti"
+	annualCount, err := h.leaveRepo.CountByUserIDYearAndType(c.Context(), claims.UserID, currentYear, "Cuti")
+	if err != nil {
+		log.Printf("ERROR: Gagal menghitung cuti tahunan untuk user %s: %v", claims.UserID.Hex(), err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil ringkasan cuti tahunan."})
+	}
+
+	// Buat respons menggunakan struct LeaveSummaryResponse
+	response := models.LeaveSummaryResponse{
+		CurrentMonthLeaveCount: monthlyCount,
+		AnnualLeaveCount:       annualCount,
+	}
+
+	// Kirim respons JSON
+	return c.Status(fiber.StatusOK).JSON(response)
 }

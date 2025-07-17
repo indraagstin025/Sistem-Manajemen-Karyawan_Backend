@@ -22,12 +22,16 @@ type LeaveRequest struct {
 
 // BARU: Tambahkan struct ini ke file models/leave_request.go Anda
 type LeaveRequestWithUser struct {
-	LeaveRequest `bson:",inline"` // Mengembed struct LeaveRequest yang sudah ada
-	UserName     string           `json:"user_name" bson:"user_name"`   // <--- UBAH DARI "user_info.name" MENJADI "user_name"
-	UserEmail    string           `json:"user_email" bson:"user_email"` // <--- UBAH DARI "user_info.email" MENJADI "user_email"
+	LeaveRequest `bson:",inline"` 
+	UserName     string           `json:"user_name" bson:"user_name"`    // <--- UBAH DARI "user_info.name" MENJADI "user_name"
+	UserEmail    string           `json:"user_email" bson:"user_email"`  // <--- UBAH DARI "user_info.email" MENJADI "user_email"
 	UserPhoto    string           `json:"user_photo,omitempty" bson:"user_photo,omitempty"` // <--- UBAH DARI "user_info.photo" MENJADI "user_photo"
 }
 
+type LeaveSummaryResponse struct {
+	CurrentMonthLeaveCount int64 `json:"current_month_leave_count"`
+	AnnualLeaveCount       int64 `json:"annual_leave_count"`
+}
 
 type LeaveRequestCreatePayload struct {
 	UserID      string `json:"user_id" validate:"required"`
@@ -36,6 +40,8 @@ type LeaveRequestCreatePayload struct {
 	RequestType string `json:"request_type" validate:"required,oneof=Cuti Sakit"`
 	Reason      string `json:"reason" validate:"required,min=10,max=500"`
 }
+
+
 
 type LeaveRequestUpdatePayload struct {
 	Status string `json:"status" validate:"required,oneof=pending approved rejected"`

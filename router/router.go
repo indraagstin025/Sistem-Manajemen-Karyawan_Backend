@@ -92,6 +92,7 @@ func SetupRoutes(
 	leaveGroup.Post("/", leaveHandler.CreateLeaveRequest)
 	leaveGroup.Post("/:id/attachment", leaveHandler.UploadAttachment)
 	leaveGroup.Get("/my-requests", leaveHandler.GetMyLeaveRequests)
+	leaveGroup.Get("/summary", leaveHandler.GetLeaveSummary)
 
 	adminLeaveGroup := leaveGroup.Group("/", middleware.AdminMiddleware()) // Grup khusus admin untuk cuti/izin
 	adminLeaveGroup.Get("/", leaveHandler.GetAllLeaveRequests)
