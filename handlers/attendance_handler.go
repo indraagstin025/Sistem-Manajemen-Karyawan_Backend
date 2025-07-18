@@ -193,7 +193,7 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 // GetAttendanceHistoryForAdmin godoc
 // @Summary Get Attendance History for All Employees (Admin)
 // @Description Mengambil riwayat kehadiran semua karyawan dengan filter dan pagination (admin only)
-// @Tags Admin Attendance
+// @Tags Admin
 // @Accept json
 // @Produce json
 // @Security BearerAuth

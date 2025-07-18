@@ -39,7 +39,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Admin Attendance"
+                    "Admin"
                 ],
                 "summary": "Get Attendance History for All Employees (Admin)",
                 "parameters": [

@@ -444,7 +444,7 @@ paths:
       - BearerAuth: []
       summary: Get Attendance History for All Employees (Admin)
       tags:
-      - Admin Attendance
+      - Admin
   /admin/dashboard-stats:
     get:
       consumes:
