@@ -196,12 +196,13 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 
 // Logout godoc
 // @Summary Logout User
-// @Description Logout user dari sistem. Frontend bertanggung jawab untuk menghapus token Paseto dari localStorage atau cookie.
+// @Description Melakukan logout user dengan menginformasikan client untuk menghapus token
 // @Tags Auth
+// @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} models.LogoutSuccessResponse
-// @Failure 401 {object} models.UnauthorizedErrorResponse
+// @Success 200 {object} object{message=string} "Logout berhasil"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	// Validasi bahwa user terautentikasi

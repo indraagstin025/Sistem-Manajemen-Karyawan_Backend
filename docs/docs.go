@@ -1233,7 +1233,10 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Logout user dari sistem. Frontend bertanggung jawab untuk menghapus token Paseto dari localStorage atau cookie.",
+                "description": "Melakukan logout user dengan menginformasikan client untuk menghapus token",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1243,15 +1246,25 @@ const docTemplate = `{
                 "summary": "Logout User",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Logout berhasil",
                         "schema": {
-                            "$ref": "#/definitions/models.LogoutSuccessResponse"
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Tidak terautentikasi",
                         "schema": {
-                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 }
@@ -2939,15 +2952,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LogoutSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Logout berhasil. Silakan hapus token dari sisi client."
-                }
-            }
-        },
         "models.QRCodeScanPayload": {
             "type": "object",
             "required": [
@@ -2960,15 +2964,6 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
-                }
-            }
-        },
-        "models.UnauthorizedErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "Token tidak valid atau tidak ada"
                 }
             }
         },

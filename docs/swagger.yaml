@@ -190,12 +190,6 @@ definitions:
       current_month_leave_count:
         type: integer
     type: object
-  models.LogoutSuccessResponse:
-    properties:
-      message:
-        example: Logout berhasil. Silakan hapus token dari sisi client.
-        type: string
-    type: object
   models.QRCodeScanPayload:
     properties:
       qr_code_value:
@@ -205,12 +199,6 @@ definitions:
     required:
     - qr_code_value
     - user_id
-    type: object
-  models.UnauthorizedErrorResponse:
-    properties:
-      error:
-        example: Token tidak valid atau tidak ada
-        type: string
     type: object
   models.User:
     properties:
@@ -1144,19 +1132,27 @@ paths:
       - Auth
   /auth/logout:
     post:
-      description: Logout user dari sistem. Frontend bertanggung jawab untuk menghapus
-        token Paseto dari localStorage atau cookie.
+      consumes:
+      - application/json
+      description: Melakukan logout user dengan menginformasikan client untuk menghapus
+        token
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Logout berhasil
           schema:
-            $ref: '#/definitions/models.LogoutSuccessResponse'
+            properties:
+              message:
+                type: string
+            type: object
         "401":
-          description: Unauthorized
+          description: Tidak terautentikasi
           schema:
-            $ref: '#/definitions/models.UnauthorizedErrorResponse'
+            properties:
+              error:
+                type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Logout User
