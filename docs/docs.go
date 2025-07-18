@@ -1226,6 +1226,37 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Logout user dari sistem. Frontend bertanggung jawab untuk menghapus token Paseto dari localStorage atau cookie.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Logout User",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.LogoutSuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnauthorizedErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/register": {
             "post": {
                 "security": [
@@ -2908,6 +2939,15 @@ const docTemplate = `{
                 }
             }
         },
+        "models.LogoutSuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Logout berhasil. Silakan hapus token dari sisi client."
+                }
+            }
+        },
         "models.QRCodeScanPayload": {
             "type": "object",
             "required": [
@@ -2920,6 +2960,15 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
+                }
+            }
+        },
+        "models.UnauthorizedErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Token tidak valid atau tidak ada"
                 }
             }
         },
