@@ -1,20 +1,23 @@
+// file: main.go
+
 package main
 
 import (
 	"Sistem-Manajemen-Karyawan/config"
-	"Sistem-Manajemen-Karyawan/repository" // BARU: import repository
+	"Sistem-Manajemen-Karyawan/repository"
 	"Sistem-Manajemen-Karyawan/router"
-	"context" // BARU: import context
-	
+	"Sistem-Manajemen-Karyawan/seeder"
+	"context"
+
 	"log"
 
-	_ "Sistem-Manajemen-Karyawan/docs"
+	_ "Sistem-Manajemen-Karyawan/docs" // Import ini mungkin digunakan untuk Swagger
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3" // BARU: import library cron
-	_ "time/tzdata"
+	"github.com/robfig/cron/v3"
+	_ "time/tzdata" // Import ini mungkin digunakan untuk zona waktu
 )
 
 // @title Sistem Manajemen Karyawan API
@@ -58,7 +61,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Warning: .env file tidak ditemukan...")
+		log.Println("Warning: .env file tidak ditemukan, menggunakan environment variables sistem")
 	}
 
 	cfg := config.LoadConfig()
@@ -74,12 +77,25 @@ func main() {
 	attendanceRepo := repository.NewAttendanceRepository()
 	workScheduleRepo := repository.NewWorkScheduleRepository()
 	leaveRequestRepo := repository.NewLeaveRequestRepository()
-	deptRepo := repository.NewDepartmentRepository() // <-- BARU: Tambahkan inisialisasi ini
+	// Menggunakan 'deptRepo' sebagai nama variabel untuk DepartmentRepository
+	deptRepo := repository.NewDepartmentRepository() 
+
+	// =======================================================
+	// Panggil Seeders (URUTAN PENTING DI SINI!)
+	// =======================================================
+	log.Println("Memulai proses seeding data dummy...")
+	// Panggil Department Seeder DULU, agar data departemen tersedia
+	seeder.SeedDepartments(deptRepo)
+	// Kemudian panggil User Seeder, yang bergantung pada data departemen
+	seeder.SeedUsers(userRepo, deptRepo)
+	log.Println("Proses seeding data dummy selesai.")
+
 
 	// =======================================================
 	// Penyiapan Cron Job
 	// =======================================================
 	c := cron.New()
+	// Pastikan scheduler dimulai setelah seeder, karena seeder butuh koneksi database
 	_, err = c.AddFunc("0 17-22 * * *", func() {
 		err := attendanceRepo.MarkAbsentEmployeesAsAlpha(
 			context.Background(),
@@ -104,11 +120,13 @@ func main() {
 	config.SetupCORS(app)
 	app.Use(logger.New())
 
-	// DIUBAH: Oper instance deptRepo juga ke SetupRoutes
-	router.SetupRoutes(app, userRepo, deptRepo, attendanceRepo, leaveRequestRepo, workScheduleRepo)
+	// DIUBAH: Pastikan semua instance repository dioper ke SetupRoutes
+	// Urutan argumen di sini harus sesuai dengan yang didefinisikan di router.SetupRoutes
+	router.SetupRoutes(app, userRepo, deptRepo, attendanceRepo, leaveRequestRepo, workScheduleRepo) 
 
 	log.Printf("Server running on port %s", cfg.Port)
+	// log.Printf("API Documentation: http://localhost:%s/docs/index.html", cfg.Port) // Baris ini bisa diaktifkan jika perlu
+	// log.Printf("Health Check: http://localhost:%s/", cfg.Port) // Baris ini bisa diaktifkan jika perlu
+	// log.Printf("CORS enabled for origins: %v", config.GetAllowedOrigins()) // Baris ini bisa diaktifkan jika perlu
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
-
-
