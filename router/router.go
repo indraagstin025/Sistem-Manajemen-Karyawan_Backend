@@ -54,6 +54,8 @@ func SetupRoutes(
 	authGroup := api.Group("/auth")
 	authGroup.Post("/register", authHandler.Register)
 	authGroup.Post("/login", authHandler.Login)
+	authGroup.Post("/logout", middleware.AuthMiddleware(), authHandler.Logout)
+
 
 	// Rute Pengguna (dilindungi otentikasi)
 	protectedUserGroup := api.Group("/users", middleware.AuthMiddleware())

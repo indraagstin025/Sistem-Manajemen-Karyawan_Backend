@@ -59,3 +59,7 @@ type ForbiddenErrorResponse struct {
 type NotFoundErrorResponse struct {
     Error string `json:"error" example:"User tidak ditemukan"`
 }
+
+type LogoutSuccessResponse struct {
+	Message string `json:"message" example:"Logout berhasil. Silakan hapus token dari sisi client."`
+}
