@@ -165,7 +165,7 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 // @Param id path string true "User ID"
 // @Param user body models.UserUpdatePayload true "Data update user"
 // @Success 200 {object} object{message=string} "User berhasil diupdate"
-// @Failure 400 {object} object{error=string,errors=array} "Invalid request body, user ID, atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body, user ID, atau validation error" // <-- Perbaikan di sini
 // @Failure 401 {object} object{error=string} "Tidak terautentikasi"
 // @Failure 403 {object} object{error=string} "Akses ditolak - hanya bisa update data sendiri"
 // @Failure 404 {object} object{message=string} "User tidak ditemukan"

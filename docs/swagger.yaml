@@ -1108,14 +1108,10 @@ paths:
                 $ref: '#/definitions/models.User'
             type: object
         "400":
-          description: Payload tidak valid atau validation error
+          description: Payload tidak valid atau validation error" // <-- Perbaikan
+            di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "401":
           description: Kombinasi email dan password salah
           schema:
@@ -1186,14 +1182,10 @@ paths:
                 type: string
             type: object
         "400":
-          description: Invalid request body atau validation error
+          description: Invalid request body atau validation error" // <-- Perbaikan
+            di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "500":
           description: Gagal hash password atau gagal mendaftarkan user
           schema:
@@ -1723,14 +1715,10 @@ paths:
                 type: string
             type: object
         "400":
-          description: Invalid request body, user ID, atau validation error
+          description: Invalid request body, user ID, atau validation error" // <--
+            Perbaikan di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "401":
           description: Tidak terautentikasi
           schema:
@@ -1908,14 +1896,10 @@ paths:
                 type: string
             type: object
         "400":
-          description: Invalid request body atau validation error
+          description: Invalid request body atau validation error" // <-- Perbaikan
+            di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "401":
           description: Tidak terautentikasi atau password lama tidak cocok
           schema:

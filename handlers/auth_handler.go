@@ -34,7 +34,7 @@ func NewAuthHandler(userRepo *repository.UserRepository) *AuthHandler {
 // @Security BearerAuth
 // @Param user body models.UserRegisterPayload true "Data registrasi user"
 // @Success 201 {object} object{message=string,user_id=string} "User berhasil didaftarkan"
-// @Failure 400 {object} object{error=string,errors=array} "Invalid request body atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body atau validation error" // <-- Perbaikan di sini
 // @Failure 500 {object} object{error=string} "Gagal hash password atau gagal mendaftarkan user"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
@@ -88,7 +88,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 // @Produce json
 // @Param credentials body models.UserLoginPayload true "Kredensial untuk Login"
 // @Success 200 {object} object{message=string,token=string,user=models.User} "Login berhasil"
-// @Failure 400 {object} object{error=string,errors=array} "Payload tidak valid atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Payload tidak valid atau validation error" // <-- Perbaikan di sini
 // @Failure 401 {object} object{error=string} "Kombinasi email dan password salah"
 // @Failure 500 {object} object{error=string} "Error internal server"
 // @Router /auth/login [post]
@@ -139,7 +139,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param password body models.ChangePasswordPayload true "Data untuk mengubah password"
 // @Success 200 {object} object{message=string} "Password berhasil diubah"
-// @Failure 400 {object} object{error=string,errors=array} "Invalid request body atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body atau validation error" // <-- Perbaikan di sini
 // @Failure 401 {object} object{error=string} "Tidak terautentikasi atau password lama tidak cocok"
 // @Failure 500 {object} object{error=string} "User tidak ditemukan atau gagal update"
 // @Router /users/change-password [post]

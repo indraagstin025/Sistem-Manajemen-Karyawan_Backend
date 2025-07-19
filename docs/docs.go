@@ -1178,17 +1178,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Payload tidak valid atau validation error",
+                        "description": "Payload tidak valid atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "401": {
@@ -1305,17 +1297,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request body atau validation error",
+                        "description": "Invalid request body atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "500": {
@@ -2042,17 +2026,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request body atau validation error",
+                        "description": "Invalid request body atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "401": {
@@ -2219,17 +2195,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request body, user ID, atau validation error",
+                        "description": "Invalid request body, user ID, atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "401": {
