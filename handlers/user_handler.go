@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -517,17 +518,16 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 
 // GetProfilePhoto godoc
 // @Summary Get User Profile Photo
-// @Description Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan redirect ke placeholder
+// @Description Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan mengembalikan placeholder default.
 // @Tags Users
 // @Accept json
 // @Produce image/jpeg,image/png,image/gif,image/webp
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Success 200 {file} file "Foto profil berhasil diambil"
-// @Success 307 {string} string "Redirect ke placeholder image"
+// @Success 200 {file} file "Foto profil berhasil diambil atau placeholder default dikembalikan"
 // @Failure 400 {object} object{error=string} "ID user tidak valid"
 // @Failure 404 {object} object{error=string} "User tidak ditemukan"
-// @Failure 500 {object} object{error=string} "Gagal mengambil foto profil"
+// @Failure 500 {object} object{error=string} "Gagal mengambil foto profil atau placeholder"
 // @Router /users/{id}/photo [get]
 func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 	userID := c.Params("id")
@@ -539,7 +539,6 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
 	defer cancel()
 
-	// Ambil user dari database
 	user, err := h.userRepo.FindUserByID(ctx, objID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil data user"})
@@ -548,16 +547,45 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User tidak ditemukan"})
 	}
 
+	// --- MODIFIKASI DIMULAI DI SINI ---
 	if user.PhotoID.IsZero() {
 		initial := "U"
 		if user.Name != "" {
 			initial = strings.ToUpper(string([]rune(user.Name)[0]))
 		}
-
+		// URL placeholder yang akan diambil oleh backend
 		placeholderURL := fmt.Sprintf("https://placehold.co/48x48/E2E8F0/4A5568?text=%s", initial)
-		return c.Redirect(placeholderURL, fiber.StatusTemporaryRedirect)
-	}
 
+		// Lakukan permintaan HTTP dari backend ke placeholderURL
+		resp, err := http.Get(placeholderURL)
+		if err != nil {
+			// Log error untuk debugging di server
+			fmt.Printf("Error fetching placeholder from external URL: %v\n", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil placeholder avatar"})
+		}
+		defer resp.Body.Close()
+
+		// Periksa status respons dari placehold.co
+		if resp.StatusCode != http.StatusOK {
+			fmt.Printf("Placeholder source returned non-OK status: %d\n", resp.StatusCode)
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Sumber placeholder avatar mengembalikan error."})
+		}
+
+		// Set header Content-Type di respons backend Anda
+		// Ini sangat penting agar browser tahu format gambarnya
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" {
+			// Fallback default jika Content-Type tidak ada (jarang terjadi pada gambar)
+			contentType = "image/png"
+		}
+		c.Set("Content-Type", contentType)
+
+		// Salin data gambar langsung dari respons placehold.co ke respons Fiber
+		return c.Status(fiber.StatusOK).SendStream(resp.Body)
+	}
+	// --- MODIFIKASI BERAKHIR DI SINI ---
+
+	// Bagian ini tetap sama untuk kasus user memiliki foto asli di GridFS
 	bucket, err := config.GetGridFSBucket()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses GridFS"})
@@ -569,7 +597,7 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca foto dari GridFS"})
 	}
 
-	contentType := "image/jpeg"
+	contentType := "image/jpeg" // Default
 	if user.PhotoMime != "" {
 		contentType = user.PhotoMime
 	}
