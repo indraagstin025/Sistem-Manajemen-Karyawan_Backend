@@ -27,7 +27,7 @@ type User struct {
 
 type UserRegisterPayload struct {
 	Name       string  `json:"name" validate:"required,min=3,max=100"`
-	Email      string  `json:"email" validate:"omitempty,email"`
+	Email      string  `json:"email" validate:"required,email"` 
 	Password   string  `json:"password" validate:"required,min=8,max=50,hasuppercase"`
 	Role       string  `json:"role" validate:"required,oneof=admin karyawan"`
 	Position   string  `json:"position"`
@@ -63,10 +63,6 @@ type ChangePasswordPayload struct {
 	NewPassword string `json:"new_password" validate:"required,min=8,max=50,hasuppercase"`
 }
 
-type DepartmentCount struct {
-	Department string `bson:"_id" json:"department"`
-	Count      int64  `bson:"count" json:"count"`
-}
 
 type DashboardStats struct {
 	TotalKaryawan         int64             `json:"total_karyawan"`
@@ -79,9 +75,4 @@ type DashboardStats struct {
 	AktivitasTerbaru      []string          `json:"aktivitas_terbaru"`
 }
 
-type Department struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Name      string             `bson:"name" json:"name"`
-	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
-}
+

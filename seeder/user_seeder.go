@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// SeedUsers berfungsi untuk memasukkan data user dummy ke database
+
 func SeedUsers(userRepo *repository.UserRepository, departmentRepo repository.DepartmentRepository) {
 	log.Println("🌱 Memulai seeding user...")
 

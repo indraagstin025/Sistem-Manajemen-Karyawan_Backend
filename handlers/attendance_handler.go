@@ -188,7 +188,7 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 	})
 }
 
-// Di attendance_handler.go
+
 
 // GetAttendanceHistoryForAdmin godoc
 // @Summary Get Attendance History for All Employees (Admin)
@@ -202,7 +202,7 @@ func (h *AttendanceHandler) GenerateQRCode(c *fiber.Ctx) error {
 // @Param user_id query string false "Filter by User ID"
 // @Param start_date query string false "Filter by Start Date (YYYY-MM-DD)"
 // @Param end_date query string false "Filter by End Date (YYYY-MM-DD)"
-// @Success 200 {object} object{data=array,total=int,page=int,limit=int} "Riwayat kehadiran berhasil diambil"
+// @Success 200 {object} object{data=[]models.AttendanceWithUser,total=int,page=int,limit=int} "Riwayat kehadiran berhasil diambil" // <-- Perbaikan di sini
 // @Failure 400 {object} object{error=string} "Invalid parameters"
 // @Failure 401 {object} object{error=string} "Unauthorized"
 // @Failure 403 {object} object{error=string} "Forbidden"
@@ -237,7 +237,6 @@ func (h *AttendanceHandler) GetAttendanceHistoryForAdmin(c *fiber.Ctx) error {
 	}
 
 	if startDateStr != "" && endDateStr != "" {
-
 		filter["date"] = bson.M{
 			"$gte": startDateStr,
 			"$lte": endDateStr,

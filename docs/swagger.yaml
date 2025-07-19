@@ -15,7 +15,6 @@ definitions:
       note:
         type: string
       status:
-        description: '--- DISESUAIKAN ---'
         enum:
         - Hadir
         - Terlambat
@@ -275,6 +274,7 @@ definitions:
         - karyawan
         type: string
     required:
+    - email
     - name
     - password
     - role
@@ -304,7 +304,6 @@ definitions:
       created_at:
         type: string
       date:
-        description: Akan menjadi tanggal MULAI jadwal
         type: string
       end_time:
         type: string
@@ -313,7 +312,6 @@ definitions:
       note:
         type: string
       recurrence_rule:
-        description: <-- TAMBAHKAN INI
         type: string
       start_time:
         type: string
@@ -400,10 +398,12 @@ paths:
       - application/json
       responses:
         "200":
-          description: Riwayat kehadiran berhasil diambil
+          description: Riwayat kehadiran berhasil diambil" // <-- Perbaikan di sini
           schema:
             properties:
               data:
+                items:
+                  $ref: '#/definitions/models.AttendanceWithUser'
                 type: array
               limit:
                 type: integer
@@ -670,10 +670,12 @@ paths:
       - application/json
       responses:
         "200":
-          description: Data users berhasil diambil
+          description: Data users berhasil diambil" // <-- Perbaikan di sini
           schema:
             properties:
               data:
+                items:
+                  $ref: '#/definitions/models.User'
                 type: array
               limit:
                 type: integer
@@ -1953,10 +1955,12 @@ paths:
       - application/json
       responses:
         "200":
-          description: Daftar jadwal kerja berhasil diambil
+          description: Daftar jadwal kerja berhasil diambil" // <-- Perbaikan di sini
           schema:
             properties:
               data:
+                items:
+                  $ref: '#/definitions/models.WorkSchedule'
                 type: array
             type: object
         "400":

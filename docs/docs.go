@@ -76,12 +76,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Riwayat kehadiran berhasil diambil",
+                        "description": "Riwayat kehadiran berhasil diambil\" // \u003c-- Perbaikan di sini",
                         "schema": {
                             "type": "object",
                             "properties": {
                                 "data": {
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/models.AttendanceWithUser"
+                                    }
                                 },
                                 "limit": {
                                     "type": "integer"
@@ -503,12 +506,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Data users berhasil diambil",
+                        "description": "Data users berhasil diambil\" // \u003c-- Perbaikan di sini",
                         "schema": {
                             "type": "object",
                             "properties": {
                                 "data": {
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/models.User"
+                                    }
                                 },
                                 "limit": {
                                     "type": "integer"
@@ -2511,12 +2517,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Daftar jadwal kerja berhasil diambil",
+                        "description": "Daftar jadwal kerja berhasil diambil\" // \u003c-- Perbaikan di sini",
                         "schema": {
                             "type": "object",
                             "properties": {
                                 "data": {
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/models.WorkSchedule"
+                                    }
                                 }
                             }
                         }
@@ -2692,7 +2701,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "description": "--- DISESUAIKAN ---",
                     "type": "string",
                     "enum": [
                         "Hadir",
@@ -3036,6 +3044,7 @@ const docTemplate = `{
         "models.UserRegisterPayload": {
             "type": "object",
             "required": [
+                "email",
                 "name",
                 "password",
                 "role"
@@ -3117,7 +3126,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "date": {
-                    "description": "Akan menjadi tanggal MULAI jadwal",
                     "type": "string"
                 },
                 "end_time": {
@@ -3130,7 +3138,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "recurrence_rule": {
-                    "description": "\u003c-- TAMBAHKAN INI",
                     "type": "string"
                 },
                 "start_time": {

@@ -107,7 +107,7 @@ func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
 // @Param limit query int false "Items per page (default: 10, max: 100)"
 // @Param search query string false "Search by name or email"
 // @Param role query string false "Filter by role"
-// @Success 200 {object} object{data=array,total=int,page=int,limit=int} "Data users berhasil diambil"
+// @Success 200 {object} object{data=[]models.User,total=int,page=int,limit=int} "Data users berhasil diambil" // <-- Perbaikan di sini
 // @Failure 401 {object} object{error=string} "Tidak terautentikasi"
 // @Failure 403 {object} object{error=string} "Akses ditolak - hanya admin"
 // @Failure 500 {object} object{error=string} "Gagal mengambil data users"

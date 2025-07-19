@@ -26,11 +26,6 @@ func NewWorkScheduleHandler(repo *repository.WorkScheduleRepository) *WorkSchedu
 	}
 }
 
-// ======================================================================
-// FUNGSI getHolidayMap, getExternalHolidaysForFrontend, dan struct HolidayAPIData
-// TELAH DIHAPUS DARI FILE INI KARENA SUDAH PINDAH KE pkg/utils
-// ======================================================================
-
 // CreateWorkSchedule godoc
 // @Summary Create Work Schedule
 // @Description Membuat jadwal kerja baru dengan opsi recurrence rule (admin only)
@@ -133,82 +128,81 @@ func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param start_date query string true "Tanggal mulai (YYYY-MM-DD)"
 // @Param end_date query string true "Tanggal selesai (YYYY-MM-DD)"
-// @Success 200 {object} object{data=array} "Daftar jadwal kerja berhasil diambil"
+// @Success 200 {object} object{data=[]models.WorkSchedule} "Daftar jadwal kerja berhasil diambil" // <-- Perbaikan di sini
 // @Failure 400 {object} object{error=string} "Format tanggal tidak valid"
 // @Failure 500 {object} object{error=string} "Gagal mengambil jadwal kerja"
 // @Router /work-schedules [get]
 func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
-	layout := "2006-01-02"
-	startDateStr := c.Query("start_date")
-	endDateStr := c.Query("end_date")
+    layout := "2006-01-02"
+    startDateStr := c.Query("start_date")
+    endDateStr := c.Query("end_date")
 
-	startDate, err := time.Parse(layout, startDateStr)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid start_date format"})
-	}
-	endDate, err := time.Parse(layout, endDateStr)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid end_date format"})
-	}
+    startDate, err := time.Parse(layout, startDateStr)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid start_date format"})
+    }
+    endDate, err := time.Parse(layout, endDateStr)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid end_date format"})
+    }
 
-	scheduleRules, err := h.workScheduleRepo.FindAllWithFilter(bson.M{})
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch schedule rules"})
-	}
+    scheduleRules, err := h.workScheduleRepo.FindAllWithFilter(bson.M{})
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch schedule rules"})
+    }
 
-	// DIUBAH: Memanggil dari utils
-	holidayMap, err := util.GetHolidayMap(startDate.Format("2006"))
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch holidays"})
-	}
-	if startDate.Year() != endDate.Year() {
-		nextYearHolidays, _ := util.GetHolidayMap(endDate.Format("2006")) // DIUBAH
-		for date, val := range nextYearHolidays {
-			holidayMap[date] = val
-		}
-	}
+    holidayMap, err := util.GetHolidayMap(startDate.Format("2006"))
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch holidays"})
+    }
+    if startDate.Year() != endDate.Year() {
+        nextYearHolidays, _ := util.GetHolidayMap(endDate.Format("2006"))
+        for date, val := range nextYearHolidays {
+            holidayMap[date] = val
+        }
+    }
 
-	finalSchedules := []models.WorkSchedule{}
+    finalSchedules := []models.WorkSchedule{}
 
-	for _, rule := range scheduleRules {
-		if rule.RecurrenceRule != "" {
-			rOption, err := rrule.StrToROption(rule.RecurrenceRule)
-			if err != nil {
-				continue
-			}
-			ruleStartDate, _ := time.Parse(layout, rule.Date)
-			rOption.Dtstart = ruleStartDate
-			rr, err := rrule.NewRRule(*rOption)
-			if err != nil {
-				continue
-			}
-			ruleSet := rrule.Set{}
-			ruleSet.RRule(rr)
-			instances := ruleSet.Between(startDate, endDate, true)
-			for _, instance := range instances {
-				instanceDateStr := instance.Format(layout)
-				if !holidayMap[instanceDateStr] {
-					finalSchedules = append(finalSchedules, models.WorkSchedule{
-						ID:             rule.ID,
-						Date:           instanceDateStr,
-						StartTime:      rule.StartTime,
-						EndTime:        rule.EndTime,
-						Note:           rule.Note,
-						RecurrenceRule: rule.RecurrenceRule,
-					})
-				}
-			}
-		} else {
-			ruleDate, _ := time.Parse(layout, rule.Date)
-			if (ruleDate.After(startDate) || ruleDate.Equal(startDate)) && (ruleDate.Before(endDate) || ruleDate.Equal(endDate)) {
-				if !holidayMap[rule.Date] {
-					finalSchedules = append(finalSchedules, rule)
-				}
-			}
-		}
-	}
+    for _, rule := range scheduleRules {
+        if rule.RecurrenceRule != "" {
+            rOption, err := rrule.StrToROption(rule.RecurrenceRule)
+            if err != nil {
+                continue
+            }
+            ruleStartDate, _ := time.Parse(layout, rule.Date)
+            rOption.Dtstart = ruleStartDate
+            rr, err := rrule.NewRRule(*rOption)
+            if err != nil {
+                continue
+            }
+            ruleSet := rrule.Set{}
+            ruleSet.RRule(rr)
+            instances := ruleSet.Between(startDate, endDate, true)
+            for _, instance := range instances {
+                instanceDateStr := instance.Format(layout)
+                if !holidayMap[instanceDateStr] {
+                    finalSchedules = append(finalSchedules, models.WorkSchedule{
+                        ID:             rule.ID,
+                        Date:           instanceDateStr,
+                        StartTime:      rule.StartTime,
+                        EndTime:        rule.EndTime,
+                        Note:           rule.Note,
+                        RecurrenceRule: rule.RecurrenceRule,
+                    })
+                }
+            }
+        } else {
+            ruleDate, _ := time.Parse(layout, rule.Date)
+            if (ruleDate.After(startDate) || ruleDate.Equal(startDate)) && (ruleDate.Before(endDate) || ruleDate.Equal(endDate)) {
+                if !holidayMap[rule.Date] {
+                    finalSchedules = append(finalSchedules, rule)
+                }
+            }
+        }
+    }
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": finalSchedules})
+    return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": finalSchedules})
 }
 
 // UpdateWorkSchedule godoc
