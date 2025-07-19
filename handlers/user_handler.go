@@ -5,8 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
-	"net/http"
+	"log"	
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/models"
+	"github.com/fogleman/gg"
 	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
 )
@@ -530,6 +530,7 @@ func (h *UserHandler) UploadProfilePhoto(c *fiber.Ctx) error {
 // @Failure 500 {object} object{error=string} "Gagal mengambil foto profil atau placeholder"
 // @Router /users/{id}/photo [get]
 func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
+	// Bagian validasi ID dan pencarian user tetap sama
 	userID := c.Params("id")
 	objID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
@@ -541,67 +542,79 @@ func (h *UserHandler) GetProfilePhoto(c *fiber.Ctx) error {
 
 	user, err := h.userRepo.FindUserByID(ctx, objID)
 	if err != nil {
+		log.Printf("Error finding user by ID %s: %v", userID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil data user"})
 	}
 	if user == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User tidak ditemukan"})
 	}
 
-	// --- MODIFIKASI DIMULAI DI SINI ---
+	// Jika PhotoID kosong (user belum upload foto)
 	if user.PhotoID.IsZero() {
-		initial := "U"
-		if user.Name != "" {
-			initial = strings.ToUpper(string([]rune(user.Name)[0]))
-		}
-		// URL placeholder yang akan diambil oleh backend
-		placeholderURL := fmt.Sprintf("https://placehold.co/48x48/E2E8F0/4A5568?text=%s", initial)
+		// --- PERBAIKAN DIMULAI DI SINI ---
 
-		// Lakukan permintaan HTTP dari backend ke placeholderURL
-		resp, err := http.Get(placeholderURL)
-		if err != nil {
-			// Log error untuk debugging di server
-			fmt.Printf("Error fetching placeholder from external URL: %v\n", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil placeholder avatar"})
-		}
-		defer resp.Body.Close()
+		// io.Pipe membuat pasangan reader (pr) dan writer (pw) yang terhubung.
+		// Data yang ditulis ke 'pw' akan bisa dibaca dari 'pr'.
+		pr, pw := io.Pipe()
 
-		// Periksa status respons dari placehold.co
-		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("Placeholder source returned non-OK status: %d\n", resp.StatusCode)
-			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Sumber placeholder avatar mengembalikan error."})
-		}
+		// Proses pembuatan gambar harus dijalankan di goroutine terpisah
+		// agar tidak memblokir proses pengiriman data ke klien.
+		go func() {
+			// Penting: Pastikan untuk menutup writer setelah selesai,
+			// ini akan memberi sinyal kepada reader bahwa data sudah berakhir.
+			defer pw.Close()
 
-		// Set header Content-Type di respons backend Anda
-		// Ini sangat penting agar browser tahu format gambarnya
-		contentType := resp.Header.Get("Content-Type")
-		if contentType == "" {
-			// Fallback default jika Content-Type tidak ada (jarang terjadi pada gambar)
-			contentType = "image/png"
-		}
-		c.Set("Content-Type", contentType)
+			initial := "A"
+			if user.Name != "" {
+				initial = strings.ToUpper(string([]rune(user.Name)[0]))
+			}
 
-		// Salin data gambar langsung dari respons placehold.co ke respons Fiber
-		return c.Status(fiber.StatusOK).SendStream(resp.Body)
+			dc := gg.NewContext(128, 128)
+			dc.SetHexColor("#E2E8F0")
+			dc.Clear()
+			dc.SetHexColor("#4A5568")
+
+			if err := dc.LoadFontFace("public/fonts/Inter-Bold.ttf", 64); err != nil {
+				log.Printf("Could not load font file: %v", err)
+			} else {
+				dc.DrawStringAnchored(initial, 128/2, 128/2, 0.5, 0.5)
+			}
+
+			// Tulis gambar PNG yang sudah jadi ke dalam 'PipeWriter'.
+			// Jika ada error saat menulis, tutup pipe dengan error tersebut.
+			if err := dc.EncodePNG(pw); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+
+		// Set header Content-Type
+		c.Set("Content-Type", "image/png")
+
+		// Kirim 'PipeReader' ke klien. SendStream akan membaca dari 'pr'
+		// dan mengalirkannya ke browser hingga 'pr' ditutup.
+		return c.SendStream(pr)
+		// --- PERBAIKAN BERAKHIR DI SINI ---
 	}
-	// --- MODIFIKASI BERAKHIR DI SINI ---
 
-	// Bagian ini tetap sama untuk kasus user memiliki foto asli di GridFS
+	// Bagian ini untuk mengambil foto dari GridFS, tidak ada perubahan
 	bucket, err := config.GetGridFSBucket()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses GridFS"})
+		log.Printf("Error accessing GridFS: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengakses penyimpanan file"})
 	}
 
 	var buf bytes.Buffer
 	_, err = bucket.DownloadToStream(user.PhotoID, &buf)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca foto dari GridFS"})
+		log.Printf("Error reading photo from GridFS for user %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membaca foto profil"})
 	}
 
-	contentType := "image/jpeg" // Default
+	contentType := "image/jpeg"
 	if user.PhotoMime != "" {
 		contentType = user.PhotoMime
 	}
 	c.Set("Content-Type", contentType)
 
-	return c.Send(buf.Bytes())
+	return c.Status(fiber.StatusOK).Send(buf.Bytes())
 }
