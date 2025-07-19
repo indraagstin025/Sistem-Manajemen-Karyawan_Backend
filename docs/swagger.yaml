@@ -299,6 +299,15 @@ definitions:
       position:
         type: string
     type: object
+  models.ValidationErrorResponse:
+    properties:
+      error:
+        example: Validation failed
+        type: string
+      errors:
+        example: 'email: email tidak valid, password: password terlalu pendek'
+        type: string
+    type: object
   models.WorkSchedule:
     properties:
       created_at:
@@ -508,14 +517,10 @@ paths:
                 type: string
             type: object
         "400":
-          description: Invalid request body atau validation error
+          description: Invalid request body atau validation error" // <-- Perbaikan
+            di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "409":
           description: Nama departemen sudah ada
           schema:
@@ -609,14 +614,10 @@ paths:
                 type: string
             type: object
         "400":
-          description: Invalid request body, ID format, atau validation error
+          description: Invalid request body, ID format, atau validation error" //
+            <-- Perbaikan di sini
           schema:
-            properties:
-              error:
-                type: string
-              errors:
-                type: array
-            type: object
+            $ref: '#/definitions/models.ValidationErrorResponse'
         "404":
           description: Departemen tidak ditemukan
           schema:

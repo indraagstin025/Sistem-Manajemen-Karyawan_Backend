@@ -34,7 +34,7 @@ func NewDepartmentHandler(deptRepo repository.DepartmentRepository) *DepartmentH
 // @Security BearerAuth
 // @Param department body models.Department true "Data departemen baru"
 // @Success 201 {object} object{message=string,id=string} "Departemen berhasil ditambahkan"
-// @Failure 400 {object} object{error=string,errors=array} "Invalid request body atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body atau validation error" // <-- Perbaikan di sini
 // @Failure 409 {object} object{error=string} "Nama departemen sudah ada"
 // @Failure 500 {object} object{error=string} "Gagal membuat departemen"
 // @Router /admin/departments [post]
@@ -137,7 +137,7 @@ func (h *DepartmentHandler) GetDepartmentByID(c *fiber.Ctx) error {
 // @Param id path string true "Department ID"
 // @Param department body models.Department true "Data departemen untuk diupdate"
 // @Success 200 {object} object{message=string} "Departemen berhasil diupdate"
-// @Failure 400 {object} object{error=string,errors=array} "Invalid request body, ID format, atau validation error"
+// @Failure 400 {object} models.ValidationErrorResponse "Invalid request body, ID format, atau validation error" // <-- Perbaikan di sini
 // @Failure 404 {object} object{message=string} "Departemen tidak ditemukan"
 // @Failure 409 {object} object{error=string} "Nama departemen sudah ada"
 // @Failure 500 {object} object{error=string} "Gagal mengupdate departemen"

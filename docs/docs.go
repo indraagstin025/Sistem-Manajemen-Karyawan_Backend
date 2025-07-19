@@ -251,17 +251,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request body atau validation error",
+                        "description": "Invalid request body atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "409": {
@@ -338,17 +330,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request body, ID format, atau validation error",
+                        "description": "Invalid request body, ID format, atau validation error\" // \u003c-- Perbaikan di sini",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {
-                                    "type": "string"
-                                },
-                                "errors": {
-                                    "type": "array"
-                                }
-                            }
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     },
                     "404": {
@@ -3116,6 +3100,19 @@ const docTemplate = `{
                 },
                 "position": {
                     "type": "string"
+                }
+            }
+        },
+        "models.ValidationErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Validation failed"
+                },
+                "errors": {
+                    "type": "string",
+                    "example": "email: email tidak valid, password: password terlalu pendek"
                 }
             }
         },
