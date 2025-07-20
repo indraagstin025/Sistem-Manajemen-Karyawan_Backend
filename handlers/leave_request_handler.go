@@ -61,7 +61,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan, tanggal mulai, tanggal selesai, dan alasan wajib diisi."})
 	}
 
-	if requestType != "Cuti" && requestType != "Sakit" {
+	if !strings.EqualFold(requestType, "Cuti") && !strings.EqualFold(requestType, "Sakit") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Jenis pengajuan tidak valid. Hanya 'Cuti' atau 'Sakit' yang diterima."})
 	}
 
@@ -112,7 +112,7 @@ func (h *LeaveRequestHandler) CreateLeaveRequest(c *fiber.Ctx) error {
 			})
 		}
 
-	} else if requestType == "Sakit" {
+	} else if strings.EqualFold(requestType, "Sakit") {
 		// Validasi: Cek tumpang tindih tanggal untuk pengajuan Sakit (bisa rentang tanggal)
 		for d := parsedStartDate; !d.After(parsedEndDate); d = d.AddDate(0, 0, 1) {
 			dateStr := d.Format("2006-01-02")
