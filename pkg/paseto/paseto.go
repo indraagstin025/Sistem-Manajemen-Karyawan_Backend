@@ -25,7 +25,8 @@ func NewPasetoMaker() (*PasetoMaker, error) {
 		return nil, fmt.Errorf("PASETO_SECRET tidak ditemukan di environment variables")
 	}
 
-	decodedKey, err := base64.URLEncoding.DecodeString(secretBase64)
+	// SESUDAH
+	decodedKey, err := base64.StdEncoding.DecodeString(secretBase64)
 	if err != nil {
 		return nil, fmt.Errorf("gagal decode PASETO_SECRET dari base64: %w", err)
 	}
