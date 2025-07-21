@@ -24,7 +24,7 @@ func SeedUsers(userRepo *repository.UserRepository, departmentRepo repository.De
 
 	rand.Seed(time.Now().UnixNano())
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Password123"), bcrypt.DefaultCost)
 	if err != nil {
 		log.Fatalf("❌ Gagal hash password: %v", err)
 	}

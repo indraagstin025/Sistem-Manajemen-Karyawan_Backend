@@ -112,23 +112,27 @@ func (r *WorkScheduleRepository) FindAllWithFilter(filter bson.M) ([]models.Work
 }
 
 func (r *WorkScheduleRepository) UpdateByID(id primitive.ObjectID, payload *models.WorkScheduleUpdatePayload) error {
-	update := bson.M{
-		"$set": bson.M{
-			"start_time": payload.StartTime,
-			"end_time":   payload.EndTime,
-			"note":       payload.Note,
-			"updated_at": time.Now(),
-		},
-	}
+    update := bson.M{
+        "$set": bson.M{
+            "start_time":      payload.StartTime,
+            "end_time":        payload.EndTime,
+            "note":            payload.Note,
+            "recurrence_rule": payload.RecurrenceRule, 
+            "updated_at":      time.Now(),
+        },
+    }
 
-	result, err := r.Collection.UpdateByID(context.TODO(), id, update)
-	if err != nil {
-		return err
-	}
-	if result.MatchedCount == 0 {
-		return errors.New("jadwal tidak ditemukan")
-	}
-	return nil
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    result, err := r.Collection.UpdateByID(ctx, id, update) 
+    if err != nil {
+        return err
+    }
+    if result.MatchedCount == 0 {
+        return errors.New("jadwal tidak ditemukan")
+    }
+    return nil
 }
 
 func (r *WorkScheduleRepository) FindByID(id primitive.ObjectID) (*models.WorkSchedule, error) {
