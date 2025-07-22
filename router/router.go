@@ -104,22 +104,12 @@ func SetupRoutes(
 	// Rute Jadwal Kerja (Work Schedules) - Diperbarui
 	// ======================================================
 	workScheduleGroup := api.Group("/work-schedules", middleware.AuthMiddleware())
-
-	// Rute untuk SEMUA PENGGUNA TERAUTENTIKASI (Admin & Karyawan) untuk MELIHAT jadwal
-	// Endpoint ini cerdas dan otomatis memfilter hari libur.
 	workScheduleGroup.Get("/", workScheduleHandler.GetAllWorkSchedules)
-
-	// Rute KHUSUS ADMIN untuk MENGELOLA (Create, Update, Delete) aturan jadwal
 	workScheduleGroup.Post("/", middleware.AdminMiddleware(), workScheduleHandler.CreateWorkSchedule)
 	workScheduleGroup.Put("/:id", middleware.AdminMiddleware(), workScheduleHandler.UpdateWorkSchedule)
 	workScheduleGroup.Delete("/:id", middleware.AdminMiddleware(), workScheduleHandler.DeleteWorkSchedule)
 	workScheduleGroup.Get("/:id", middleware.AdminMiddleware(), workScheduleHandler.GetWorkScheduleById) 
-    
-    // ======================================================
-    // RUTE HARI LIBUR - INI YANG HILANG DAN PERLU DITAMBAHKAN!
-    // ======================================================
-    // Rute untuk mendapatkan daftar hari libur. Diproteksi dengan AuthMiddleware.
-    api.Get("/holidays", middleware.AuthMiddleware(), workScheduleHandler.GetHolidays) // <--- TAMBAHKAN BARIS INI!
+    api.Get("/holidays", middleware.AuthMiddleware(), workScheduleHandler.GetHolidays) 
 
 
 	log.Println("Semua rute aplikasi berhasil didaftarkan.")
