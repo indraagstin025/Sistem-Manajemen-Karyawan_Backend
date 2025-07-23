@@ -6,7 +6,7 @@ import (
 	"Sistem-Manajemen-Karyawan/config"
 	"Sistem-Manajemen-Karyawan/repository"
 	"Sistem-Manajemen-Karyawan/router"
-	"Sistem-Manajemen-Karyawan/seeder"
+	// "Sistem-Manajemen-Karyawan/seeder"
 	// "Sistem-Manajemen-Karyawan/seeder"
 	"context"
 
@@ -84,12 +84,12 @@ func main() {
 	// =======================================================
 	// Panggil Seeders (URUTAN PENTING DI SINI!)
 	// =======================================================
-	log.Println("Memulai proses seeding data dummy...")
-	// Panggil Department Seeder DULU, agar data departemen tersedia
-	seeder.SeedDepartments(deptRepo)
-	// Kemudian panggil User Seeder, yang bergantung pada data departemen
-	seeder.SeedUsers(userRepo, deptRepo)
-	log.Println("Proses seeding data dummy selesai.")
+	// log.Println("Memulai proses seeding data dummy...")
+	// // Panggil Department Seeder DULU, agar data departemen tersedia
+	// seeder.SeedDepartments(deptRepo)
+	// // Kemudian panggil User Seeder, yang bergantung pada data departemen
+	// seeder.SeedUsers(userRepo, deptRepo)
+	// log.Println("Proses seeding data dummy selesai.")
 
 
 	// =======================================================
