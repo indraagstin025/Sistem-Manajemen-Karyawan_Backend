@@ -35,7 +35,7 @@ import (
 //
 // @host https://sistem-manajemen-karyawanbackend-production.up.railway.app/
 // @BasePath /api/v1
-// @schemes http https
+// @schemes https
 //
 // @securityDefinitions.apikey BearerAuth
 // @in header

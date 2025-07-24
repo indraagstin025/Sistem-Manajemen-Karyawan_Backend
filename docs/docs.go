@@ -3173,7 +3173,7 @@ var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "https://sistem-manajemen-karyawanbackend-production.up.railway.app/",
 	BasePath:         "/api/v1",
-	Schemes:          []string{"http", "https"},
+	Schemes:          []string{"https"},
 	Title:            "Sistem Manajemen Karyawan API",
 	Description:      "API untuk sistem manajemen karyawan dengan fitur attendance, leave request, dan manajemen user",
 	InfoInstanceName: "swagger",

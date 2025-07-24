@@ -2040,7 +2040,6 @@ paths:
       tags:
       - Work Schedule
 schemes:
-- http
 - https
 securityDefinitions:
   BearerAuth:
