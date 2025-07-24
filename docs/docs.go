@@ -2254,7 +2254,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan redirect ke placeholder",
+                "description": "Mengambil foto profil user berdasarkan ID. Jika tidak ada foto, akan mengembalikan placeholder default.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2279,15 +2279,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Foto profil berhasil diambil",
+                        "description": "Foto profil berhasil diambil atau placeholder default dikembalikan",
                         "schema": {
                             "type": "file"
-                        }
-                    },
-                    "307": {
-                        "description": "Redirect ke placeholder image",
-                        "schema": {
-                            "type": "string"
                         }
                     },
                     "400": {
@@ -2313,7 +2307,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Gagal mengambil foto profil",
+                        "description": "Gagal mengambil foto profil atau placeholder",
                         "schema": {
                             "type": "object",
                             "properties": {

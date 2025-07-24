@@ -1757,7 +1757,7 @@ paths:
       consumes:
       - application/json
       description: Mengambil foto profil user berdasarkan ID. Jika tidak ada foto,
-        akan redirect ke placeholder
+        akan mengembalikan placeholder default.
       parameters:
       - description: User ID
         in: path
@@ -1771,13 +1771,9 @@ paths:
       - image/webp
       responses:
         "200":
-          description: Foto profil berhasil diambil
+          description: Foto profil berhasil diambil atau placeholder default dikembalikan
           schema:
             type: file
-        "307":
-          description: Redirect ke placeholder image
-          schema:
-            type: string
         "400":
           description: ID user tidak valid
           schema:
@@ -1793,7 +1789,7 @@ paths:
                 type: string
             type: object
         "500":
-          description: Gagal mengambil foto profil
+          description: Gagal mengambil foto profil atau placeholder
           schema:
             properties:
               error:
