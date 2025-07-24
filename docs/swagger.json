@@ -19,7 +19,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:3000",
+    "host": "https://sistem-manajemen-karyawanbackend-production.up.railway.app/",
     "basePath": "/api/v1",
     "paths": {
         "/admin/attendance/history": {
