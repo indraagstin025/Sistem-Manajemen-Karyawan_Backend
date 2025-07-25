@@ -213,50 +213,59 @@ func (r *attendanceRepository) UpdateAttendanceCheckout(ctx context.Context, att
 	return res, nil
 }
 
+
+
 func (r *attendanceRepository) GetTodayAttendanceWithUserDetails(ctx context.Context) ([]models.AttendanceWithUser, error) {
-	today := time.Now().Format("2006-01-02")
 
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.D{{Key: "date", Value: today}}}},
-		{{Key: "$lookup", Value: bson.D{
-			{Key: "from", Value: config.UserCollection},
-			{Key: "localField", Value: "user_id"},
-			{Key: "foreignField", Value: "_id"},
-			{Key: "as", Value: "userDetails"},
-		}}},
-		{{Key: "$unwind", Value: "$userDetails"}},
-		{{Key: "$project", Value: bson.D{
-			{Key: "_id", Value: "$_id"},
-			{Key: "id", Value: "$_id"},
-			{Key: "user_id", Value: 1},
-			{Key: "date", Value: 1},
-			{Key: "check_in", Value: 1},
-			{Key: "check_out", Value: 1},
-			{Key: "status", Value: 1},
-			{Key: "note", Value: 1},
-			{Key: "user_name", Value: "$userDetails.name"},
-			{Key: "user_email", Value: "$userDetails.email"},
-			{Key: "user_photo", Value: "$userDetails.photo"},
-			{Key: "user_position", Value: "$userDetails.position"},
-			{Key: "user_department", Value: "$userDetails.department"},
-		}}},
-	}
+    wib, err := time.LoadLocation("Asia/Jakarta")
+    if err != nil {
 
-	cursor, err := r.attendanceCollection.Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, fmt.Errorf("gagal aggregation untuk daftar kehadiran hari ini: %w", err)
-	}
-	defer cursor.Close(ctx)
+        return nil, fmt.Errorf("gagal memuat zona waktu Asia/Jakarta: %w", err)
+    }
+   
+    today := time.Now().In(wib).Format("2006-01-02")
 
-	var results []models.AttendanceWithUser
-	if err = cursor.All(ctx, &results); err != nil {
-		return nil, fmt.Errorf("gagal decode hasil aggregation kehadiran: %w", err)
-	}
+    pipeline := mongo.Pipeline{
+        {{Key: "$match", Value: bson.D{{Key: "date", Value: today}}}},
+        {{Key: "$lookup", Value: bson.D{
+            {Key: "from", Value: config.UserCollection},
+            {Key: "localField", Value: "user_id"},
+            {Key: "foreignField", Value: "_id"},
+            {Key: "as", Value: "userDetails"},
+        }}},
+        {{Key: "$unwind", Value: "$userDetails"}},
+        {{Key: "$project", Value: bson.D{
+            {Key: "_id", Value: "$_id"},
+            {Key: "id", Value: "$_id"},
+            {Key: "user_id", Value: 1},
+            {Key: "date", Value: 1},
+            {Key: "check_in", Value: 1},
+            {Key: "check_out", Value: 1},
+            {Key: "status", Value: 1},
+            {Key: "note", Value: 1},
+            {Key: "user_name", Value: "$userDetails.name"},
+            {Key: "user_email", Value: "$userDetails.email"},
+            {Key: "user_photo", Value: "$userDetails.photo"},
+            {Key: "user_position", Value: "$userDetails.position"},
+            {Key: "user_department", Value: "$userDetails.department"},
+        }}},
+    }
 
-	if len(results) == 0 {
-		return []models.AttendanceWithUser{}, nil
-	}
-	return results, nil
+    cursor, err := r.attendanceCollection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return nil, fmt.Errorf("gagal aggregation untuk daftar kehadiran hari ini: %w", err)
+    }
+    defer cursor.Close(ctx)
+
+    var results []models.AttendanceWithUser
+    if err = cursor.All(ctx, &results); err != nil {
+        return nil, fmt.Errorf("gagal decode hasil aggregation kehadiran: %w", err)
+    }
+
+    if len(results) == 0 {
+        return []models.AttendanceWithUser{}, nil
+    }
+    return results, nil
 }
 
 func (r *attendanceRepository) FindAttendanceByUserID(ctx context.Context, userID primitive.ObjectID) ([]models.Attendance, error) {
