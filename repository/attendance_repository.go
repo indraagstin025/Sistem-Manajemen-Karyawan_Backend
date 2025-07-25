@@ -217,13 +217,13 @@ func (r *attendanceRepository) UpdateAttendanceCheckout(ctx context.Context, att
 
 func (r *attendanceRepository) GetTodayAttendanceWithUserDetails(ctx context.Context) ([]models.AttendanceWithUser, error) {
 
-    wib, err := time.LoadLocation("Asia/Jakarta")
-    if err != nil {
+    // wib, err := time.LoadLocation("Asia/Jakarta")
+    // if err != nil {
 
-        return nil, fmt.Errorf("gagal memuat zona waktu Asia/Jakarta: %w", err)
-    }
+    //     return nil, fmt.Errorf("gagal memuat zona waktu Asia/Jakarta: %w", err)
+    // }
    
-    today := time.Now().In(wib).Format("2006-01-02")
+    today := "2025-07-24"
 
 	fmt.Printf("✅ [DEBUG] Mengambil data absensi untuk tanggal: %s\n", today)
 
