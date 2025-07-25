@@ -225,6 +225,8 @@ func (r *attendanceRepository) GetTodayAttendanceWithUserDetails(ctx context.Con
    
     today := time.Now().In(wib).Format("2006-01-02")
 
+	fmt.Printf("✅ [DEBUG] Mengambil data absensi untuk tanggal: %s\n", today)
+
     pipeline := mongo.Pipeline{
         {{Key: "$match", Value: bson.D{{Key: "date", Value: today}}}},
         {{Key: "$lookup", Value: bson.D{
