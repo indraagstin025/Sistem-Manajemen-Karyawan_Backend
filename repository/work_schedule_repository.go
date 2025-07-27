@@ -197,25 +197,33 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 
 	for i := range applicableRules {
 		rule := applicableRules[i]
-
-		 log.Printf("[DEBUG]   Memeriksa Aturan: ID=%s, Date=%s, RecurrenceRule='%s'", rule.ID.Hex(), rule.Date, rule.RecurrenceRule)
+		// --- LOG 3: Memeriksa setiap aturan yang ditemukan ---
+		log.Printf("[DEBUG]   Memeriksa Aturan: ID=%s, Date=%s, RecurrenceRule='%s'", rule.ID.Hex(), rule.Date, rule.RecurrenceRule)
+		
 		isApplicable := false
-		instanceDate := date // Default ke tanggal yang dicari
+		instanceDate := date 
 
-		// Cek apakah aturan ini berlaku untuk tanggal yang dicari
 		if rule.RecurrenceRule == "" {
 			if rule.Date == date {
 				isApplicable = true
 			}
 		} else {
 			rOption, err := rrule.StrToROption(rule.RecurrenceRule)
-			if err != nil { continue }
+			if err != nil {
+				// --- LOG ERROR TERSEMBUNYI ---
+                log.Printf("[ERROR] Gagal parsing RRule string untuk aturan ID %s: %v", rule.ID.Hex(), err)
+				continue
+			}
 			
 			ruleStartDate, _ := time.Parse("2006-01-02", rule.Date)
 			rOption.Dtstart = ruleStartDate
 			
 			rr, err := rrule.NewRRule(*rOption)
-			if err != nil { continue }
+			if err != nil {
+				// --- LOG ERROR TERSEMBUNYI ---
+                log.Printf("[ERROR] Gagal membuat RRule object untuk aturan ID %s: %v", rule.ID.Hex(), err)
+				continue
+			}
 			
 			if len(rr.Between(targetDate, targetDate, true)) > 0 {
 				isApplicable = true
@@ -223,9 +231,7 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 		}
 
 		if isApplicable {
-			// --- LOG 3: Aturan yang cocok ditemukan ---
 			log.Printf("[DEBUG]   -> Aturan ID %s COCOK untuk tanggal %s.", rule.ID.Hex(), date)
-
 			instance := rule
 			instance.Date = instanceDate
 
@@ -233,7 +239,7 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 			if rule.UserID != nil && !rule.UserID.IsZero() {
 				log.Printf("[DEBUG]     -> Ditemukan sebagai JADWAL SPESIFIK. Pencarian dihentikan.")
 				specificSchedule = &instance
-				break // Jadwal spesifik punya prioritas tertinggi, langsung hentikan loop
+				break 
 			} else {
 				log.Printf("[DEBUG]     -> Ditemukan sebagai JADWAL UMUM.")
 				globalSchedule = &instance
