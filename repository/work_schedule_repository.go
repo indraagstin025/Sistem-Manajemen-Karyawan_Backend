@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/teambition/rrule-go"
@@ -155,51 +156,100 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 		return nil, fmt.Errorf("format tanggal tidak valid: %s", date)
 	}
 
-	// Panggil fungsi dari package utils
-	holidayMap, err := util.GetHolidayMap(targetDate.Format("2006")) // <-- DIUBAH
+	// --- LOG 1: Memulai proses pencarian ---
+	log.Printf("[DEBUG] Mencari jadwal untuk User: %s pada Tanggal: %s", userID.Hex(), date)
+
+	// Cek hari libur
+	holidayMap, err := util.GetHolidayMap(targetDate.Format("2006"))
 	if err != nil {
-		fmt.Printf("Peringatan: Gagal mengambil data hari libur: %v\n", err)
+		log.Printf("[WARN] Gagal mengambil data hari libur: %v", err)
 	}
 	if holidayMap != nil && holidayMap[date] {
+		log.Printf("[DEBUG] Tanggal %s adalah hari libur. Pencarian dihentikan.", date)
 		return nil, errors.New("jadwal tidak ditemukan (hari libur)")
 	}
 
+	// Filter yang kuat untuk mengambil jadwal spesifik ATAU jadwal umum
 	filter := bson.M{
-    "$or": []bson.M{
-        {"user_id": userID},                   // Jadwal spesifik untuk user ini
-        {"user_id": nil},                      // Jadwal umum (dibuat dengan kode baru)
-        {"user_id": bson.M{"$exists": false}}, // Jadwal umum (dibuat dengan kode lama)
-    },
-}
-	allScheduleRules, err := r.FindAllWithFilter(filter)
+		"$or": []bson.M{
+			{"user_id": userID},
+			{"user_id": nil},
+			{"user_id": bson.M{"$exists": false}},
+		},
+	}
+
+	applicableRules, err := r.FindAllWithFilter(filter)
 	if err != nil {
+		log.Printf("[ERROR] Gagal query ke database: %v", err)
 		return nil, fmt.Errorf("gagal mengambil aturan jadwal: %w", err)
 	}
 
-	for _, rule := range allScheduleRules {
+	// --- LOG 2: Hasil query dari database ---
+	log.Printf("[DEBUG] Ditemukan %d aturan yang mungkin berlaku untuk user/umum.", len(applicableRules))
+
+	if len(applicableRules) == 0 {
+		return nil, errors.New("jadwal tidak ditemukan")
+	}
+
+	// Variabel untuk menyimpan jadwal dengan prioritas
+	var specificSchedule *models.WorkSchedule
+	var globalSchedule *models.WorkSchedule
+
+	for i := range applicableRules {
+		rule := applicableRules[i]
+		isApplicable := false
+		instanceDate := date // Default ke tanggal yang dicari
+
+		// Cek apakah aturan ini berlaku untuk tanggal yang dicari
 		if rule.RecurrenceRule == "" {
 			if rule.Date == date {
-				return &rule, nil
+				isApplicable = true
 			}
 		} else {
 			rOption, err := rrule.StrToROption(rule.RecurrenceRule)
-			if err != nil {
-				continue
-			}
+			if err != nil { continue }
+			
 			ruleStartDate, _ := time.Parse("2006-01-02", rule.Date)
 			rOption.Dtstart = ruleStartDate
+			
 			rr, err := rrule.NewRRule(*rOption)
-			if err != nil {
-				continue
-			}
+			if err != nil { continue }
+			
 			if len(rr.Between(targetDate, targetDate, true)) > 0 {
-				instanceSchedule := rule
-				instanceSchedule.Date = date
-				return &instanceSchedule, nil
+				isApplicable = true
+			}
+		}
+
+		if isApplicable {
+			// --- LOG 3: Aturan yang cocok ditemukan ---
+			log.Printf("[DEBUG]   -> Aturan ID %s COCOK untuk tanggal %s.", rule.ID.Hex(), date)
+
+			instance := rule
+			instance.Date = instanceDate
+
+			// Cek prioritas: Spesifik > Umum
+			if rule.UserID != nil && !rule.UserID.IsZero() {
+				log.Printf("[DEBUG]     -> Ditemukan sebagai JADWAL SPESIFIK. Pencarian dihentikan.")
+				specificSchedule = &instance
+				break // Jadwal spesifik punya prioritas tertinggi, langsung hentikan loop
+			} else {
+				log.Printf("[DEBUG]     -> Ditemukan sebagai JADWAL UMUM.")
+				globalSchedule = &instance
 			}
 		}
 	}
 
+	// Kembalikan hasil berdasarkan prioritas
+	if specificSchedule != nil {
+		log.Printf("[DEBUG] => FINAL: Mengembalikan JADWAL SPESIFIK untuk tanggal %s.", date)
+		return specificSchedule, nil
+	}
+	if globalSchedule != nil {
+		log.Printf("[DEBUG] => FINAL: Mengembalikan JADWAL UMUM untuk tanggal %s.", date)
+		return globalSchedule, nil
+	}
+
+	log.Printf("[DEBUG] => FINAL: TIDAK ADA JADWAL yang cocok untuk tanggal %s setelah diproses.", date)
 	return nil, errors.New("jadwal tidak ditemukan")
 }
 
