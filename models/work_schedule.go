@@ -7,14 +7,15 @@ import (
 )
 
 type WorkSchedule struct {
-	ID             primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Date           string             `json:"date" bson:"date"`                
-	StartTime      string             `json:"start_time" bson:"start_time"`
-	EndTime        string             `json:"end_time" bson:"end_time"`
-	Note           string             `json:"note,omitempty" bson:"note,omitempty"`
-	RecurrenceRule string             `json:"recurrence_rule,omitempty" bson:"recurrence_rule,omitempty"` 
-	CreatedAt      time.Time          `json:"created_at" bson:"created_at,omitempty"`
-	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at,omitempty"`
+	ID             primitive.ObjectID  `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID         *primitive.ObjectID `json:"user_id,omitempty" bson:"user_id,omitempty"` // <-- TAMBAHKAN FIELD INI
+	Date           string              `json:"date" bson:"date"`
+	StartTime      string              `json:"start_time" bson:"start_time"`
+	EndTime        string              `json:"end_time" bson:"end_time"`
+	Note           string              `json:"note,omitempty" bson:"note,omitempty"`
+	RecurrenceRule string              `json:"recurrence_rule,omitempty" bson:"recurrence_rule,omitempty"`
+	CreatedAt      time.Time           `json:"created_at" bson:"created_at,omitempty"`
+	UpdatedAt      time.Time           `json:"updated_at" bson:"updated_at,omitempty"`
 }
 
 type WorkScheduleCreatePayload struct {

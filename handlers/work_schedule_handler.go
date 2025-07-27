@@ -6,6 +6,8 @@ import (
 	"Sistem-Manajemen-Karyawan/models"
 	util "Sistem-Manajemen-Karyawan/pkg/utils"
 	"Sistem-Manajemen-Karyawan/repository"
+
+	"fmt"
 	"strings"
 	"time"
 
@@ -130,35 +132,40 @@ func (h *WorkScheduleHandler) GetWorkScheduleById(c *fiber.Ctx) error {
 // @Param end_date query string true "Tanggal selesai (YYYY-MM-DD)"
 // @Success 200 {object} object{data=[]models.WorkSchedule} "Daftar jadwal kerja berhasil diambil"
 // @Failure 400 {object} object{error=string} "Format tanggal tidak valid"
-// @Failure 401 {object} object{error=string} "Tidak terautentikasi"
+// @Failure 401 {object} object{error=string} "Tidak terautentikasi atau token tidak valid"
 // @Failure 500 {object} object{error=string} "Gagal mengambil jadwal kerja"
 // @Router /work-schedules [get]
 func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
-	// Ambil dan validasi parameter tanggal
+	// Ambil dan validasi parameter tanggal (tidak ada perubahan di sini)
 	layout := "2006-01-02"
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 
 	startDate, err := time.Parse(layout, startDateStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format start_date tidak valid"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format start_date tidak valid, gunakan YYYY-MM-DD"})
 	}
 	endDate, err := time.Parse(layout, endDateStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format end_date tidak valid"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Format end_date tidak valid, gunakan YYYY-MM-DD"})
 	}
 
-	// Ambil data pengguna dari konteks (didapat dari middleware otentikasi)
-	userPayload, ok := c.Locals("user").(*models.User) // Pastikan model User Anda memiliki field Role
-	if !ok || userPayload == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tidak terautentikasi"})
+	// ================== PERBAIKAN UTAMA DI SINI ==================
+	// 1. Baca data dari c.Locals sebagai tipe data yang benar (*paseto.Claims)
+	claims, ok := c.Locals("user").(*models.Claims) // Menggunakan models.Claims sebagai tipe data yang benar
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Tipe data token di context tidak valid"})
 	}
 
-	// ================== LOGIKA KONDISIONAL BERDASARKAN ROLE ==================
-	if userPayload.Role == "admin" {
+	// 2. Ekstrak ID dan Role dari claims
+	role := claims.Role
+	userID := claims.UserID // Menggunakan UserID dari models.Claims
+	// ==============================================================
+
+	// Logika kondisional di bawah ini sekarang akan bekerja dengan benar
+	if role == "admin" {
 		// --- LOGIKA LAMA UNTUK ADMIN (MELIHAT SEMUA) ---
 		// Kode ini dipertahankan agar admin tetap bisa melihat semua jadwal tanpa filter.
-
 		scheduleRules, err := h.workScheduleRepo.FindAllWithFilter(bson.M{})
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil aturan jadwal"})
@@ -166,7 +173,9 @@ func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 
 		holidayMap, err := util.GetHolidayMap(startDate.Format("2006"))
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil hari libur"})
+			// Sebaiknya tidak menghentikan proses jika gagal mengambil hari libur, cukup beri peringatan
+			fmt.Printf("Peringatan: Gagal mengambil data hari libur: %v\n", err)
+			holidayMap = make(map[string]bool) // Inisialisasi map kosong
 		}
 		if startDate.Year() != endDate.Year() {
 			nextYearHolidays, _ := util.GetHolidayMap(endDate.Format("2006"))
@@ -189,14 +198,13 @@ func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 				if err != nil {
 					continue
 				}
-				ruleSet := rrule.Set{}
-				ruleSet.RRule(rr)
-				instances := ruleSet.Between(startDate, endDate, true)
+				instances := rr.Between(startDate, endDate, true)
 				for _, instance := range instances {
 					instanceDateStr := instance.Format(layout)
 					if !holidayMap[instanceDateStr] {
 						finalSchedules = append(finalSchedules, models.WorkSchedule{
 							ID:             rule.ID,
+							UserID:         rule.UserID,
 							Date:           instanceDateStr,
 							StartTime:      rule.StartTime,
 							EndTime:        rule.EndTime,
@@ -218,13 +226,12 @@ func (h *WorkScheduleHandler) GetAllWorkSchedules(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": finalSchedules})
 
 	} else {
-	
-		
+		// --- LOGIKA BARU DAN EFISIEN UNTUK KARYAWAN ---
 		var dailySchedules []models.WorkSchedule
 		for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
 			dateStr := d.Format(layout)
-			// Panggil fungsi repository yang sudah "pintar"
-			schedule, err := h.workScheduleRepo.FindApplicableScheduleForUser(c.Context(), userPayload.ID, dateStr)
+			// Gunakan 'userID' yang sudah kita dapatkan dari token
+			schedule, err := h.workScheduleRepo.FindApplicableScheduleForUser(c.Context(), userID, dateStr)
 			if err == nil && schedule != nil {
 				dailySchedules = append(dailySchedules, *schedule)
 			}
