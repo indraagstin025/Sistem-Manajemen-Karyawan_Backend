@@ -197,6 +197,8 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 
 	for i := range applicableRules {
 		rule := applicableRules[i]
+
+		 log.Printf("[DEBUG]   Memeriksa Aturan: ID=%s, Date=%s, RecurrenceRule='%s'", rule.ID.Hex(), rule.Date, rule.RecurrenceRule)
 		isApplicable := false
 		instanceDate := date // Default ke tanggal yang dicari
 
