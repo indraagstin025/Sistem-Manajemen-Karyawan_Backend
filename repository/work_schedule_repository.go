@@ -164,7 +164,13 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 		return nil, errors.New("jadwal tidak ditemukan (hari libur)")
 	}
 
-	filter := bson.M{}
+	filter := bson.M{
+    "$or": []bson.M{
+        {"user_id": userID},                   // Jadwal spesifik untuk user ini
+        {"user_id": nil},                      // Jadwal umum (dibuat dengan kode baru)
+        {"user_id": bson.M{"$exists": false}}, // Jadwal umum (dibuat dengan kode lama)
+    },
+}
 	allScheduleRules, err := r.FindAllWithFilter(filter)
 	if err != nil {
 		return nil, fmt.Errorf("gagal mengambil aturan jadwal: %w", err)
@@ -198,13 +204,13 @@ func (r *WorkScheduleRepository) FindApplicableScheduleForUser(ctx context.Conte
 }
 
 func (r *WorkScheduleRepository) FindByUserAndDateRange(userID primitive.ObjectID, startDate, endDate string) ([]*models.WorkSchedule, error) {
-filter := bson.M{
-    "$or": []bson.M{
-        {"user_id": userID},                   // Jadwal spesifik untuk user ini
-        {"user_id": nil},                      // Jadwal umum (dibuat dengan kode baru)
-        {"user_id": bson.M{"$exists": false}}, // Jadwal umum (dibuat dengan kode lama)
-    },
-}
+	filter := bson.M{
+		"user_id": userID,
+		"date": bson.M{
+			"$gte": startDate,
+			"$lte": endDate,
+		},
+	}
 	cursor, err := r.Collection.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
