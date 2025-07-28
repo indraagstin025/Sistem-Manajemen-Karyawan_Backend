@@ -3171,7 +3171,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "https://sistem-manajemen-karyawanbackend-production.up.railway.app/",
+	Host:             "sistem-manajemen-karyawanbackend-production.up.railway.app",
 	BasePath:         "/api/v1",
 	Schemes:          []string{"https"},
 	Title:            "Sistem Manajemen Karyawan API",

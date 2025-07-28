@@ -361,7 +361,7 @@ definitions:
     - end_time
     - start_time
     type: object
-host: sistem-manajemen-karyawanbackend-production.up.railway.app/
+host: sistem-manajemen-karyawanbackend-production.up.railway.app
 info:
   contact:
     email: support@example.com
