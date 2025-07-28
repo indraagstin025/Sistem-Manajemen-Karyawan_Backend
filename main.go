@@ -33,7 +33,7 @@ import (
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
 //
-// @host https://sistem-manajemen-karyawanbackend-production.up.railway.app/
+// @host sistem-manajemen-karyawanbackend-production.up.railway.app/
 // @BasePath /api/v1
 // @schemes https
 //
